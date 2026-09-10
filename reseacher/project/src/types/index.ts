@@ -1,13 +1,13 @@
-export type Role = 'admin' | 'principal_investigator' | 'research_coordinator' | 'sponsor' | 'participant';
+export type Role = 'PLATFORM_ADMIN' | 'ORGANIZATION' | 'PRINCIPAL_INVESTIGATOR' | 'RESEARCH_COORDINATOR' | 'PARTICIPANT';
 
-export type StudyStatus = 'recruiting' | 'screening' | 'active' | 'completed' | 'paused';
-export type ScreeningStatus = 'candidate' | 'screening' | 'potentially_eligible' | 'human_review' | 'approved' | 'rejected';
-export type ConsentStatus = 'not_started' | 'sent' | 'viewed' | 'pending' | 'consented' | 'withdrawn';
-export type EnrollmentStatus = 'not_enrolled' | 'enrolled' | 'completed' | 'withdrawn';
-export type VisitStatus = 'scheduled' | 'completed' | 'missed' | 'cancelled';
-export type TaskPriority = 'high' | 'medium' | 'low';
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'overdue';
-export type TaskType = 'eligibility_review' | 'consent_review' | 'participant_followup' | 'visit_preparation' | 'document_review' | 'data_verification';
+export type StudyStatus = 'recruiting' | 'screening' | 'active' | 'completed' | 'paused' | 'RECRUITING' | 'SCREENING' | 'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'PLANNING';
+export type ScreeningStatus = 'candidate' | 'screening' | 'potentially_eligible' | 'human_review' | 'approved' | 'rejected' | 'CANDIDATE' | 'SCREENING' | 'POTENTIALLY_ELIGIBLE' | 'HUMAN_REVIEW' | 'APPROVED' | 'REJECTED';
+export type ConsentStatus = 'not_started' | 'sent' | 'viewed' | 'pending' | 'consented' | 'withdrawn' | 'NOT_STARTED' | 'SENT' | 'VIEWED' | 'PENDING' | 'CONSENTED' | 'WITHDRAWN' | 'SIGNED' | 'VERIFIED';
+export type EnrollmentStatus = 'not_enrolled' | 'enrolled' | 'completed' | 'withdrawn' | 'NOT_ENROLLED' | 'ENROLLED' | 'COMPLETED' | 'WITHDRAWN' | 'PENDING_APPROVAL' | 'ACTIVE';
+export type VisitStatus = 'scheduled' | 'completed' | 'missed' | 'cancelled' | 'SCHEDULED' | 'COMPLETED' | 'MISSED' | 'CANCELLED';
+export type TaskPriority = 'high' | 'medium' | 'low' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'overdue' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+export type TaskType = 'eligibility_review' | 'consent_review' | 'participant_followup' | 'visit_preparation' | 'document_review' | 'data_verification' | 'ELIGIBILITY_REVIEW' | 'CONSENT_REVIEW' | 'PARTICIPANT_FOLLOWUP' | 'VISIT_PREPARATION' | 'DOCUMENT_REVIEW' | 'DATA_VERIFICATION';
 
 export interface User {
   id: string;
@@ -17,6 +17,46 @@ export interface User {
   avatar?: string;
   organization?: string;
   specialty?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  organization_id?: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  user: AuthUser;
+}
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  type: string;
+  title: string;
+  message: string;
+  entity_type?: string;
+  entity_id?: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface EligibilityReview {
+  id: string;
+  participant_id: string;
+  study_id: string;
+  submitted_by: string;
+  assigned_to_pi: string;
+  ai_recommendation: string;
+  coordinator_recommendation: string;
+  status: string;
+  decision?: string;
+  decision_reason?: string;
+  decided_by?: string;
+  decided_at?: string;
 }
 
 export interface EligibilityCriterion {

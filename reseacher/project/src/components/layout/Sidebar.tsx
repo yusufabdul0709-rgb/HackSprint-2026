@@ -17,22 +17,31 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
+  Building2,
+  Activity,
+  ShieldAlert,
+  ShieldCheck,
+  Stethoscope,
+  Microscope,
+  FileText,
+  ClipboardCheck,
+  TestTube2,
+  Clock,
+  Home,
+  User,
+  Bell
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/types';
 import logoImg from '@/assets/logo.png';
+import { useAuth } from '@/store/AuthContext';
 
 export type NavKey =
-  | 'dashboard'
-  | 'studies'
-  | 'participants'
-  | 'screening'
-  | 'consent'
-  | 'visits'
-  | 'tasks'
-  | 'documents'
-  | 'messages'
-  | 'reports';
+  | 'dashboard' | 'organizations' | 'users' | 'platform-studies' | 'system-activity' | 'audit-logs' | 'security' | 'reports' | 'support'
+  | 'studies' | 'research-sites' | 'team' | 'participants' | 'analytics' | 'documents' | 'messages'
+  | 'my-studies' | 'eligibility-reviews' | 'protocol' | 'study-visits' | 'approvals' | 'simulation-lab'
+  | 'candidates' | 'screening' | 'consent' | 'visits' | 'tasks' | 'follow-ups'
+  | 'home' | 'my-appointments' | 'my-consent' | 'my-documents' | 'notifications' | 'profile' | 'help';
 
 interface NavItem {
   key: NavKey;
@@ -40,25 +49,66 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const researcherNav: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'studies', label: 'Studies', icon: FlaskConical },
-  { key: 'participants', label: 'Participants', icon: Users },
-  { key: 'screening', label: 'Screening', icon: Brain },
-  { key: 'consent', label: 'Consent', icon: FileSignature },
-  { key: 'visits', label: 'Visits', icon: Calendar },
-  { key: 'tasks', label: 'Tasks', icon: CheckSquare },
-  { key: 'documents', label: 'Documents', icon: Folder },
-  { key: 'messages', label: 'Messages', icon: MessageSquare },
-  { key: 'reports', label: 'Reports', icon: BarChart3 },
-];
-
-const participantNav: NavItem[] = [
-  { key: 'dashboard', label: 'Home', icon: LayoutDashboard },
-  { key: 'visits', label: 'My Visits', icon: Calendar },
-  { key: 'documents', label: 'Documents', icon: Folder },
-  { key: 'messages', label: 'Messages', icon: MessageSquare },
-];
+const navConfigs: Record<Role, NavItem[]> = {
+  PLATFORM_ADMIN: [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { key: 'organizations', label: 'Organizations', icon: Building2 },
+    { key: 'users', label: 'Users', icon: Users },
+    { key: 'platform-studies', label: 'Platform Studies', icon: FlaskConical },
+    { key: 'system-activity', label: 'System Activity', icon: Activity },
+    { key: 'audit-logs', label: 'Audit Logs', icon: FileText },
+    { key: 'security', label: 'Security', icon: ShieldAlert },
+    { key: 'reports', label: 'Reports', icon: BarChart3 },
+    { key: 'support', label: 'Support', icon: LifeBuoy },
+  ],
+  ORGANIZATION: [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { key: 'studies', label: 'Studies', icon: FlaskConical },
+    { key: 'research-sites', label: 'Research Sites', icon: Building2 },
+    { key: 'team', label: 'Team', icon: Users },
+    { key: 'participants', label: 'Participants', icon: Users },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { key: 'documents', label: 'Documents', icon: Folder },
+    { key: 'messages', label: 'Messages', icon: MessageSquare },
+    { key: 'reports', label: 'Reports', icon: FileText },
+  ],
+  PRINCIPAL_INVESTIGATOR: [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { key: 'my-studies', label: 'My Studies', icon: FlaskConical },
+    { key: 'eligibility-reviews', label: 'Eligibility Reviews', icon: ClipboardCheck },
+    { key: 'participants', label: 'Participants', icon: Users },
+    { key: 'protocol', label: 'Protocol', icon: FileText },
+    { key: 'study-visits', label: 'Study Visits', icon: Calendar },
+    { key: 'approvals', label: 'Approvals', icon: ShieldCheck },
+    { key: 'documents', label: 'Documents', icon: Folder },
+    { key: 'messages', label: 'Messages', icon: MessageSquare },
+    { key: 'reports', label: 'Reports', icon: BarChart3 },
+    { key: 'simulation-lab', label: 'Simulation Lab', icon: TestTube2 },
+  ],
+  RESEARCH_COORDINATOR: [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { key: 'my-studies', label: 'My Studies', icon: FlaskConical },
+    { key: 'candidates', label: 'Candidates', icon: Users },
+    { key: 'screening', label: 'Screening', icon: Brain },
+    { key: 'consent', label: 'Consent', icon: FileSignature },
+    { key: 'visits', label: 'Visits', icon: Calendar },
+    { key: 'tasks', label: 'Tasks', icon: CheckSquare },
+    { key: 'documents', label: 'Documents', icon: Folder },
+    { key: 'messages', label: 'Messages', icon: MessageSquare },
+    { key: 'follow-ups', label: 'Follow-ups', icon: Clock },
+  ],
+  PARTICIPANT: [
+    { key: 'home', label: 'Home', icon: Home },
+    { key: 'my-studies', label: 'My Studies', icon: FlaskConical },
+    { key: 'my-appointments', label: 'My Appointments', icon: Calendar },
+    { key: 'my-consent', label: 'My Consent', icon: FileSignature },
+    { key: 'my-documents', label: 'My Documents', icon: Folder },
+    { key: 'messages', label: 'Messages', icon: MessageSquare },
+    { key: 'notifications', label: 'Notifications', icon: Bell },
+    { key: 'profile', label: 'Profile', icon: User },
+    { key: 'help', label: 'Help', icon: HelpCircle },
+  ],
+};
 
 interface SidebarProps {
   current: NavKey;
@@ -79,13 +129,19 @@ export function Sidebar({
   collapsed = false,
   onToggleCollapse,
 }: SidebarProps) {
-  const navItems = role === 'participant' ? participantNav : researcherNav;
+  const { user } = useAuth();
+  const navItems = navConfigs[role] || navConfigs.PARTICIPANT;
+  
   const roleLabel: Record<Role, string> = {
-    admin: 'Administrator',
-    principal_investigator: 'Principal Investigator',
-    research_coordinator: 'Research Coordinator',
-    sponsor: 'Sponsor',
-    participant: 'Participant',
+    PLATFORM_ADMIN: 'Platform Admin',
+    ORGANIZATION: 'Organization',
+    PRINCIPAL_INVESTIGATOR: 'Principal Investigator',
+    RESEARCH_COORDINATOR: 'Research Coordinator',
+    PARTICIPANT: 'Participant',
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
   return (
@@ -269,15 +325,15 @@ export function Sidebar({
               'flex items-center rounded-xl py-2 cursor-pointer transition-colors hover:bg-zinc-900',
               collapsed ? 'justify-center px-1' : 'gap-3 px-3'
             )}
-            title="Sarah Chen"
+            title={user?.name || 'User'}
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-xs font-semibold text-white shadow-sm">
-              SC
+              {user ? getInitials(user.name) : 'U'}
             </div>
             {!collapsed && (
               <>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">Sarah Chen</p>
+                  <p className="truncate text-sm font-medium text-white">{user?.name || 'User'}</p>
                   <p className="truncate text-xs text-zinc-400">{roleLabel[role]}</p>
                 </div>
                 <HelpCircle className="h-4 w-4 text-zinc-500" />

@@ -17,16 +17,16 @@ export const currentUser: User = {
   id: 'u1',
   name: 'Sarah Chen',
   email: 'sarah.chen@trialbridge.io',
-  role: 'admin',
+  role: 'PLATFORM_ADMIN',
   organization: 'TrialBridge',
 };
 
 export const users: User[] = [
   currentUser,
-  { id: 'u2', name: 'Dr. James Patel', email: 'j.patel@cityhospital.org', role: 'principal_investigator', organization: 'City Hospital', specialty: 'Endocrinology' },
-  { id: 'u3', name: 'Maya Rodriguez', email: 'maya.r@trialbridge.io', role: 'research_coordinator', organization: 'TrialBridge' },
-  { id: 'u4', name: 'Michael Torres', email: 'm.torres@pharmaco.com', role: 'sponsor', organization: 'PharmaCo Research' },
-  { id: 'u5', name: 'Rahul Mehta', email: 'rahul.mehta@email.com', role: 'participant', organization: 'City Hospital' },
+  { id: 'u2', name: 'Dr. James Patel', email: 'j.patel@cityhospital.org', role: 'PRINCIPAL_INVESTIGATOR', organization: 'City Hospital', specialty: 'Endocrinology' },
+  { id: 'u3', name: 'Maya Rodriguez', email: 'maya.r@trialbridge.io', role: 'RESEARCH_COORDINATOR', organization: 'TrialBridge' },
+  { id: 'u4', name: 'Michael Torres', email: 'm.torres@pharmaco.com', role: 'ORGANIZATION', organization: 'PharmaCo Research' },
+  { id: 'u5', name: 'Rahul Mehta', email: 'rahul.mehta@email.com', role: 'PARTICIPANT', organization: 'City Hospital' },
 ];
 
 export const organizations: Organization[] = [
@@ -215,22 +215,22 @@ export const documents: Document[] = [
 ];
 
 export const messages: Message[] = [
-  { id: 'm1', from: 'Dr. James Patel', fromRole: 'principal_investigator', to: 'Maya Rodriguez', toRole: 'research_coordinator', subject: 'P00124 Screening Approved', preview: 'I have approved the screening for Rahul Mehta. Please proceed with consent...', body: 'I have approved the screening for Rahul Mehta (P00124). Please proceed with consent scheduling at your earliest convenience. The AI screening results look solid, and I have verified the medication history.', date: '2026-09-09', time: '9:30 AM', read: false, type: 'eligibility_review' },
-  { id: 'm2', from: 'System', fromRole: 'admin', to: 'Maya Rodriguez', toRole: 'research_coordinator', subject: 'Visit Reminder: P00124', preview: 'Reminder: Screening visit for Rahul Mehta scheduled for Sep 10 at 8:00 AM...', body: 'This is an automated reminder. A screening visit for Rahul Mehta (P00124) is scheduled for September 10, 2026 at 8:00 AM at City Hospital, Chennai. Please ensure all pre-visit preparations are completed.', date: '2026-09-09', time: '8:00 AM', read: false, type: 'visit_reminder' },
-  { id: 'm3', from: 'Maya Rodriguez', fromRole: 'research_coordinator', to: 'Rahul Mehta', toRole: 'participant', subject: 'Consent Document Ready for Review', preview: 'Your consent document for the Diabetes Treatment Study is ready for review...', body: 'Dear Rahul, your consent document for the Diabetes Treatment Study is now ready for your review. Please log in to your participant portal to review and sign the document at your convenience. If you have any questions, please do not hesitate to reach out.', date: '2026-09-08', time: '3:00 PM', read: true, type: 'consent_reminder' },
-  { id: 'm4', from: 'Dr. Vikram Reddy', fromRole: 'principal_investigator', to: 'Maya Rodriguez', toRole: 'research_coordinator', subject: 'New Task: Document Review', preview: 'Please review the updated protocol document for the Oncology Research Study...', body: 'Please review the updated protocol document for the Oncology Research Study. There are some changes to the inclusion criteria that need to be verified before our next screening cycle.', date: '2026-09-07', time: '2:15 PM', read: true, type: 'task_assignment' },
-  { id: 'm5', from: 'Michael Torres', fromRole: 'sponsor', to: 'Dr. James Patel', toRole: 'principal_investigator', subject: 'Quarterly Study Update', preview: 'Sponsor review scheduled for next week. Please prepare enrollment statistics...', body: 'Dear Dr. Patel, our quarterly sponsor review is scheduled for next week. Please prepare the current enrollment statistics and any adverse event reports for the Diabetes Treatment Study. Thank you for your continued work on this important trial.', date: '2026-09-06', time: '11:00 AM', read: true, type: 'study_update' },
+  { id: 'm1', from: 'Dr. James Patel', fromRole: 'PRINCIPAL_INVESTIGATOR', to: 'Maya Rodriguez', toRole: 'RESEARCH_COORDINATOR', subject: 'P00124 Screening Approved', preview: 'I have approved the screening for Rahul Mehta. Please proceed with consent...', body: 'I have approved the screening for Rahul Mehta (P00124). Please proceed with consent scheduling at your earliest convenience. The AI screening results look solid, and I have verified the medication history.', date: '2026-09-09', time: '9:30 AM', read: false, type: 'eligibility_review' },
+  { id: 'm2', from: 'System', fromRole: 'PLATFORM_ADMIN', to: 'Maya Rodriguez', toRole: 'RESEARCH_COORDINATOR', subject: 'Visit Reminder: P00124', preview: 'Reminder: Screening visit for Rahul Mehta scheduled for Sep 10 at 8:00 AM...', body: 'This is an automated reminder. A screening visit for Rahul Mehta (P00124) is scheduled for September 10, 2026 at 8:00 AM at City Hospital, Chennai. Please ensure all pre-visit preparations are completed.', date: '2026-09-09', time: '8:00 AM', read: false, type: 'visit_reminder' },
+  { id: 'm3', from: 'Maya Rodriguez', fromRole: 'RESEARCH_COORDINATOR', to: 'Rahul Mehta', toRole: 'PARTICIPANT', subject: 'Consent Document Ready for Review', preview: 'Your consent document for the Diabetes Treatment Study is ready for review...', body: 'Dear Rahul, your consent document for the Diabetes Treatment Study is now ready for your review. Please log in to your participant portal to review and sign the document at your convenience. If you have any questions, please do not hesitate to reach out.', date: '2026-09-08', time: '3:00 PM', read: true, type: 'consent_reminder' },
+  { id: 'm4', from: 'Dr. Vikram Reddy', fromRole: 'PRINCIPAL_INVESTIGATOR', to: 'Maya Rodriguez', toRole: 'RESEARCH_COORDINATOR', subject: 'New Task: Document Review', preview: 'Please review the updated protocol document for the Oncology Research Study...', body: 'Please review the updated protocol document for the Oncology Research Study. There are some changes to the inclusion criteria that need to be verified before our next screening cycle.', date: '2026-09-07', time: '2:15 PM', read: true, type: 'task_assignment' },
+  { id: 'm5', from: 'Michael Torres', fromRole: 'ORGANIZATION', to: 'Dr. James Patel', toRole: 'PRINCIPAL_INVESTIGATOR', subject: 'Quarterly Study Update', preview: 'Sponsor review scheduled for next week. Please prepare enrollment statistics...', body: 'Dear Dr. Patel, our quarterly sponsor review is scheduled for next week. Please prepare the current enrollment statistics and any adverse event reports for the Diabetes Treatment Study. Thank you for your continued work on this important trial.', date: '2026-09-06', time: '11:00 AM', read: true, type: 'study_update' },
 ];
 
 export const auditLogs: AuditLog[] = [
-  { id: 'al1', action: 'New study created', user: 'Dr. James Patel', userRole: 'principal_investigator', target: 'Diabetes Treatment Study', timestamp: '2026-09-09 14:32', category: 'study' },
-  { id: 'al2', action: 'Research coordinator added', user: 'Sarah Chen', userRole: 'admin', target: 'Maya Rodriguez', timestamp: '2026-09-09 11:15', category: 'system' },
-  { id: 'al3', action: 'Participant enrolled', user: 'Dr. James Patel', userRole: 'principal_investigator', target: 'P00124 Rahul Mehta', timestamp: '2026-09-08 16:45', category: 'participant' },
-  { id: 'al4', action: 'Consent document uploaded', user: 'Maya Rodriguez', userRole: 'research_coordinator', target: 'Consent_Form_v2.1.pdf', timestamp: '2026-09-08 10:20', category: 'document' },
-  { id: 'al5', action: 'Study updated', user: 'Dr. Anita Sharma', userRole: 'principal_investigator', target: 'Cardiac Health Study', timestamp: '2026-09-07 15:30', category: 'study' },
-  { id: 'al6', action: 'Screening approved', user: 'Dr. Vikram Reddy', userRole: 'principal_investigator', target: 'P66302 Sanjay Gupta', timestamp: '2026-09-05 13:00', category: 'screening' },
-  { id: 'al7', action: 'Participant screening rejected', user: 'Dr. Priya Nair', userRole: 'principal_investigator', target: 'P77403 Lakshmi Iyer', timestamp: '2026-09-01 10:45', category: 'screening' },
-  { id: 'al8', action: 'Consent signed', user: 'Maya Rodriguez', userRole: 'research_coordinator', target: 'P55201 Deepa Raj', timestamp: '2026-08-20 09:15', category: 'consent' },
+  { id: 'al1', action: 'New study created', user: 'Dr. James Patel', userRole: 'PRINCIPAL_INVESTIGATOR', target: 'Diabetes Treatment Study', timestamp: '2026-09-09 14:32', category: 'study' },
+  { id: 'al2', action: 'Research coordinator added', user: 'Sarah Chen', userRole: 'PLATFORM_ADMIN', target: 'Maya Rodriguez', timestamp: '2026-09-09 11:15', category: 'system' },
+  { id: 'al3', action: 'Participant enrolled', user: 'Dr. James Patel', userRole: 'PRINCIPAL_INVESTIGATOR', target: 'P00124 Rahul Mehta', timestamp: '2026-09-08 16:45', category: 'participant' },
+  { id: 'al4', action: 'Consent document uploaded', user: 'Maya Rodriguez', userRole: 'RESEARCH_COORDINATOR', target: 'Consent_Form_v2.1.pdf', timestamp: '2026-09-08 10:20', category: 'document' },
+  { id: 'al5', action: 'Study updated', user: 'Dr. Anita Sharma', userRole: 'PRINCIPAL_INVESTIGATOR', target: 'Cardiac Health Study', timestamp: '2026-09-07 15:30', category: 'study' },
+  { id: 'al6', action: 'Screening approved', user: 'Dr. Vikram Reddy', userRole: 'PRINCIPAL_INVESTIGATOR', target: 'P66302 Sanjay Gupta', timestamp: '2026-09-05 13:00', category: 'screening' },
+  { id: 'al7', action: 'Participant screening rejected', user: 'Dr. Priya Nair', userRole: 'PRINCIPAL_INVESTIGATOR', target: 'P77403 Lakshmi Iyer', timestamp: '2026-09-01 10:45', category: 'screening' },
+  { id: 'al8', action: 'Consent signed', user: 'Maya Rodriguez', userRole: 'RESEARCH_COORDINATOR', target: 'P55201 Deepa Raj', timestamp: '2026-08-20 09:15', category: 'consent' },
 ];
 
 export const recentActivity: Activity[] = [

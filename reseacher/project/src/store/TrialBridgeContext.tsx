@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type {
   Study,
   Participant,
@@ -12,7 +12,8 @@ import type {
   ConsentStatus,
   EnrollmentStatus,
 } from '@/types';
-import * as mockData from '@/data/mockData';
+import { useAuth } from './AuthContext';
+import api from '@/lib/api';
 
 interface TrialBridgeContextType {
   role: Role;
@@ -37,130 +38,134 @@ interface TrialBridgeContextType {
 const TrialBridgeContext = createContext<TrialBridgeContextType | null>(null);
 
 export function TrialBridgeProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>('admin');
-  const [studies, setStudies] = useState<Study[]>(mockData.studies);
-  const [participants, setParticipants] = useState<Participant[]>(mockData.participants);
-  const [visits, setVisits] = useState<Visit[]>(mockData.visits);
-  const [tasks, setTasks] = useState<Task[]>(mockData.tasks);
-  const [consentRecords, setConsentRecords] = useState<ConsentRecord[]>(mockData.consentRecords);
-  const [documents, setDocuments] = useState<Document[]>(mockData.documents);
-  const [messages, setMessages] = useState<Message[]>(mockData.messages);
+  const { role, isAuthenticated } = useAuth();
+  
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [consentRecords, setConsentRecords] = useState<ConsentRecord[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  const addStudy = useCallback((study: Study) => {
-    setStudies((prev) => [...prev, study]);
+  const fetchInitialData = async () => {
+    if (!isAuthenticated) return;
+    try {
+      const [
+        studiesRes,
+        participantsRes,
+        visitsRes,
+        tasksRes,
+        consentRes,
+        documentsRes,
+        messagesRes
+      ] = await Promise.all([
+        api.get('/studies').catch(() => ({ data: [] })),
+        api.get('/participants').catch(() => ({ data: [] })),
+        api.get('/visits').catch(() => ({ data: [] })),
+        api.get('/tasks').catch(() => ({ data: [] })),
+        api.get('/consent-records').catch(() => ({ data: [] })),
+        api.get('/documents').catch(() => ({ data: [] })),
+        api.get('/messages').catch(() => ({ data: [] }))
+      ]);
+
+      setStudies(studiesRes.data || []);
+      setParticipants(participantsRes.data || []);
+      setVisits(visitsRes.data || []);
+      setTasks(tasksRes.data || []);
+      setConsentRecords(consentRes.data || []);
+      setDocuments(documentsRes.data || []);
+      setMessages(messagesRes.data || []);
+    } catch (error) {
+      console.error('Error fetching initial data', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [isAuthenticated]);
+
+  const addStudy = useCallback(async (study: Study) => {
+    try {
+      const res = await api.post('/studies', study);
+      setStudies((prev) => [...prev, res.data]);
+    } catch (e) {
+      console.error(e);
+      setStudies((prev) => [...prev, study]);
+    }
   }, []);
 
-  const approveScreening = useCallback((participantId: string, reviewerName: string, notes: string) => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.id === participantId
-          ? {
-              ...p,
-              screeningStatus: 'approved' as ScreeningStatus,
-              screeningReviewed: true,
-              screeningReviewedBy: reviewerName,
-              screeningReviewedDate: new Date().toISOString().split('T')[0],
-              screeningNotes: notes,
-              consentStatus: 'sent' as ConsentStatus,
-              lastActivity: new Date().toISOString().split('T')[0],
-            }
-          : p
-      )
-    );
-    setConsentRecords((prev) => {
-      const participant = participants.find((p) => p.id === participantId);
-      if (!participant) return prev;
-      const exists = prev.find((c) => c.participantId === participantId && c.studyId === participant.studyId);
-      if (exists) return prev;
-      return [
-        ...prev,
-        {
-          id: `cr-${Date.now()}`,
-          participantId,
-          participantName: participant.name,
-          studyId: participant.studyId,
-          studyName: participant.studyName,
-          consentVersion: 'v1.0',
-          dateSent: new Date().toISOString().split('T')[0],
-          researcher: reviewerName,
-          status: 'sent' as ConsentStatus,
-        },
-      ];
-    });
-  }, [participants]);
-
-  const rejectScreening = useCallback((participantId: string, reviewerName: string, notes: string) => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.id === participantId
-          ? {
-              ...p,
-              screeningStatus: 'rejected' as ScreeningStatus,
-              screeningReviewed: true,
-              screeningReviewedBy: reviewerName,
-              screeningReviewedDate: new Date().toISOString().split('T')[0],
-              screeningNotes: notes,
-              lastActivity: new Date().toISOString().split('T')[0],
-            }
-          : p
-      )
-    );
+  const approveScreening = useCallback(async (participantId: string, reviewerName: string, notes: string) => {
+    try {
+      await api.post(`/participants/${participantId}/approve-screening`, { reviewerName, notes });
+      fetchInitialData();
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const updateConsentStatus = useCallback((participantId: string, status: ConsentStatus) => {
-    setParticipants((prev) =>
-      prev.map((p) => (p.id === participantId ? { ...p, consentStatus: status, lastActivity: new Date().toISOString().split('T')[0] } : p))
-    );
-    setConsentRecords((prev) =>
-      prev.map((c) => {
-        if (c.participantId !== participantId) return c;
-        const update: Partial<ConsentRecord> = { status };
-        if (status === 'viewed' && !c.dateViewed) update.dateViewed = new Date().toISOString().split('T')[0];
-        if (status === 'consented') update.dateSigned = new Date().toISOString().split('T')[0];
-        return { ...c, ...update };
-      })
-    );
+  const rejectScreening = useCallback(async (participantId: string, reviewerName: string, notes: string) => {
+    try {
+      await api.post(`/participants/${participantId}/reject-screening`, { reviewerName, notes });
+      fetchInitialData();
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const enrollParticipant = useCallback((participantId: string) => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.id === participantId
-          ? {
-              ...p,
-              enrollmentStatus: 'enrolled' as EnrollmentStatus,
-              enrolledDate: new Date().toISOString().split('T')[0],
-              lastActivity: new Date().toISOString().split('T')[0],
-            }
-          : p
-      )
-    );
-    setStudies((prev) =>
-      prev.map((s) => {
-        const participant = participants.find((p) => p.id === participantId);
-        if (!participant || participant.studyId !== s.id) return s;
-        return { ...s, enrolledParticipants: s.enrolledParticipants + 1 };
-      })
-    );
-  }, [participants]);
-
-  const scheduleVisit = useCallback((visit: Visit) => {
-    setVisits((prev) => [...prev, visit]);
+  const updateConsentStatus = useCallback(async (participantId: string, status: ConsentStatus) => {
+    try {
+      await api.patch(`/participants/${participantId}/consent`, { status });
+      fetchInitialData();
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const updateTaskStatus = useCallback((taskId: string, status: Task['status']) => {
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+  const enrollParticipant = useCallback(async (participantId: string) => {
+    try {
+      await api.post(`/participants/${participantId}/enroll`);
+      fetchInitialData();
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const markMessageRead = useCallback((messageId: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, read: true } : m)));
+  const scheduleVisit = useCallback(async (visit: Visit) => {
+    try {
+      const res = await api.post('/visits', visit);
+      setVisits((prev) => [...prev, res.data]);
+    } catch (e) {
+      console.error(e);
+      setVisits((prev) => [...prev, visit]);
+    }
+  }, []);
+
+  const updateTaskStatus = useCallback(async (taskId: string, status: Task['status']) => {
+    try {
+      await api.patch(`/tasks/${taskId}`, { status });
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    } catch (e) {
+      console.error(e);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    }
+  }, []);
+
+  const markMessageRead = useCallback(async (messageId: string) => {
+    try {
+      await api.patch(`/messages/${messageId}/read`);
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, read: true } : m)));
+    } catch (e) {
+      console.error(e);
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, read: true } : m)));
+    }
   }, []);
 
   return (
     <TrialBridgeContext.Provider
       value={{
         role,
-        setRole,
+        setRole: () => {}, // No-op, role comes from AuthContext
         studies,
         participants,
         visits,
