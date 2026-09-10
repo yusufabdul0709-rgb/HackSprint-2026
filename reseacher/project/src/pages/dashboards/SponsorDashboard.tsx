@@ -21,16 +21,24 @@ import {
   Line,
   Cell,
 } from 'recharts';
-import { enrollmentTrendData, sitePerformanceData, trialPerformanceData } from '@/data/mockData';
+import {
+  computeEnrollmentTrend,
+  computeSitePerformance,
+  computeTrialPerformance,
+} from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 export function SponsorDashboard() {
   const { studies, participants } = useTrialBridge();
   const activeTrials = studies.length;
-  const researchSites = 5;
   const totalParticipants = participants.length;
   const enrolledCount = participants.filter((p) => p.enrollmentStatus === 'enrolled').length;
-  const enrollmentRate = Math.round((enrolledCount / totalParticipants) * 100);
+  const enrollmentRate = totalParticipants > 0 ? Math.round((enrolledCount / totalParticipants) * 100) : 0;
+
+  const enrollmentTrendData = computeEnrollmentTrend(participants, studies);
+  const sitePerformanceData = computeSitePerformance(studies, participants);
+  const trialPerformanceData = computeTrialPerformance(studies);
+  const researchSites = sitePerformanceData.length;
 
   return (
     <div className="space-y-6">

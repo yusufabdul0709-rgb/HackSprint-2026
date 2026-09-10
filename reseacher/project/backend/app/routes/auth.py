@@ -168,7 +168,12 @@ def read_users_me(current_user: dict = Depends(get_current_user)):
     if db_instance.is_connected and db_instance.db is not None:
         from app.repositories import users as user_repo
         user = user_repo.get_by_id(db_instance.db, current_user["id"])
+        if not user and current_user.get("email"):
+            user = user_repo.get_by_email(db_instance.db, current_user["email"])
         if user:
+            user.pop("hashed_password", None)
+            if "_id" in user and "id" not in user:
+                user["id"] = str(user["_id"])
             return user
     
     # Otherwise return verified claims from JWT

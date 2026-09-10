@@ -23,13 +23,15 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-import { userGrowthData, organizations, recentActivity, auditLogs } from '@/data/mockData';
+import { organizations, recentActivity, auditLogs } from '@/data/mockData';
+import { computeUserGrowthData } from '@/lib/analytics';
 
 export function AdminDashboard() {
   const { studies, participants } = useTrialBridge();
   const totalUsers = organizations.reduce((sum, o) => sum + o.users, 0);
-  const totalParticipants = organizations.reduce((sum, o) => sum + o.participants, 0);
+  const totalParticipants = participants.length > 0 ? participants.length : organizations.reduce((sum, o) => sum + o.participants, 0);
   const activeStudies = studies.filter((s) => s.status === 'active' || s.status === 'recruiting' || s.status === 'screening').length;
+  const userGrowthData = computeUserGrowthData(participants, totalUsers);
 
   return (
     <div className="space-y-6">

@@ -22,6 +22,14 @@ import {
   Sparkles,
   User,
   FileText,
+  Activity,
+  HeartPulse,
+  Droplets,
+  ShieldCheck,
+  TrendingDown,
+  ArrowRight,
+  TestTube2,
+  Pill,
 } from 'lucide-react';
 import {
   BarChart,
@@ -35,10 +43,29 @@ import {
   Line,
   Cell,
 } from 'recharts';
-import { recruitmentFunnelData, enrollmentTrendData, studyPerformanceData } from '@/data/mockData';
+import {
+  computeRecruitmentFunnel,
+  computeEnrollmentTrend,
+  computeStudyPerformance,
+  computeClinicalEfficacyMetrics,
+  computePharmacokineticsMetrics,
+  computeSafetyMetrics,
+} from '@/lib/analytics';
+import type { NavKey } from '@/components/layout/Sidebar';
 
-export function PrincipalInvestigatorDashboard() {
+interface PrincipalInvestigatorDashboardProps {
+  onNavigate?: (page: NavKey) => void;
+}
+
+export function PrincipalInvestigatorDashboard({ onNavigate }: PrincipalInvestigatorDashboardProps) {
   const { studies, participants, visits, tasks } = useTrialBridge();
+
+  const recruitmentFunnelData = computeRecruitmentFunnel(participants);
+  const enrollmentTrendData = computeEnrollmentTrend(participants, studies);
+  const studyPerformanceData = computeStudyPerformance(studies);
+  const clinicalEfficacy = computeClinicalEfficacyMetrics(participants);
+  const pkMetrics = computePharmacokineticsMetrics(participants);
+  const safetyMetrics = computeSafetyMetrics(participants);
 
   const pendingDecisions = participants.filter((p) => p.screeningStatus === 'potentially_eligible' || p.screeningStatus === 'human_review').length;
   const upcomingVisits = visits.filter((v) => v.status === 'scheduled').length;
@@ -75,19 +102,19 @@ export function PrincipalInvestigatorDashboard() {
       id: 'P002',
       name: 'Elena Rostova',
       participantCode: 'P002',
-      study: 'Cardiac Regeneration Trial',
-      studyId: 'CD-202',
+      study: 'Type 2 Diabetes Study (C4H11N5 Renal Dynamics)',
+      studyId: 'ST-001',
       age: 62,
       gender: 'Female',
       aiRecommendation: 'Requires Human Review',
       aiConfidence: 78.5,
       coordinatorRecommendation: 'Proceed',
-      coordinatorNotes: 'Ejection fraction is borderline 38%. PI clinical discretion requested.',
+      coordinatorNotes: 'Renal eGFR is borderline 52 mL/min. PI clinical discretion requested for C4H11N5 clearance safety.',
       status: 'PENDING',
       criteria: [
-        { name: 'Age 40-80', rule: '40 <= Age <= 80', patientValue: '62 years', result: 'MATCH', evidence: 'EHR verified' },
-        { name: 'LVEF <= 40%', rule: 'LVEF <= 40', patientValue: '38%', result: 'REVIEW', evidence: 'Echo report shows 38-41% range' },
-        { name: 'No Arrhythmia (last 6mo)', rule: 'Arrhythmia == False', patientValue: 'Negative', result: 'MATCH', evidence: 'Holter monitor clean' }
+        { name: 'Age 30-65', rule: '30 <= Age <= 65', patientValue: '62 years', result: 'MATCH', evidence: 'EHR verified' },
+        { name: 'eGFR >= 45 mL/min', rule: 'eGFR >= 45', patientValue: '52 mL/min', result: 'REVIEW', evidence: 'Borderline renal filtration rate' },
+        { name: 'HbA1c >= 7.0%', rule: 'HbA1c >= 7.0', patientValue: '7.6%', result: 'MATCH', evidence: 'Recent lab drawn' }
       ]
     }
   ]);
@@ -120,10 +147,155 @@ export function PrincipalInvestigatorDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={FlaskConical} label="Active Studies" value={activeStudies} change="2 new" changeType="neutral" iconBg="bg-blue-50" iconColor="text-blue-600" delay={0} />
-        <MetricCard icon={Users} label="Total Participants" value={totalParticipants} change="14%" iconBg="bg-purple-50" iconColor="text-purple-600" delay={60} />
-        <MetricCard icon={AlertTriangle} label="Pending Decisions" value={pendingDecisions} change="3 new" changeType="negative" iconBg="bg-amber-50" iconColor="text-amber-600" delay={120} />
-        <MetricCard icon={CalendarClock} label="Upcoming Visits" value={upcomingVisits} change="This week" changeType="neutral" iconBg="bg-green-50" iconColor="text-green-600" delay={180} />
+        <MetricCard icon={FlaskConical} label="Active Study" value={activeStudies} change="Type 2 Diabetes" changeType="neutral" iconBg="bg-blue-50" iconColor="text-blue-600" delay={0} />
+        <MetricCard icon={Users} label="Trial Cohort" value={totalParticipants} change="100% Titrated" changeType="positive" iconBg="bg-purple-50" iconColor="text-purple-600" delay={60} />
+        <MetricCard icon={HeartPulse} label="Mean HbA1c Drop" value={`${clinicalEfficacy.overall.meanHba1cChange}%`} change="Baseline 8.22% → 7.14%" changeType="positive" iconBg="bg-emerald-50" iconColor="text-emerald-600" delay={120} />
+        <MetricCard icon={Droplets} label="Renal Clearance" value={`${pkMetrics.meanClearance} L/h`} change={`${pkMetrics.meanRenalExcretion}% excreted`} changeType="neutral" iconBg="bg-cyan-50" iconColor="text-cyan-600" delay={180} />
+      </div>
+
+      {/* Clinical Trial Endpoint Analytics Banner */}
+      <div className="rounded-2xl border border-blue-200/80 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 text-white shadow-md animate-fade-in">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-700/60 pb-5">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-blue-500/20 border border-blue-400/30 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
+                Phase III Clinical Trial
+              </span>
+              <span className="rounded-md bg-red-500/20 border border-red-400/30 px-2.5 py-0.5 text-xs font-bold text-red-300">
+                Kidneys (Red Highlight)
+              </span>
+              <span className="rounded-md bg-indigo-500/20 border border-indigo-400/30 px-2.5 py-0.5 text-xs font-mono font-bold text-indigo-300">
+                Formula: C₄H₁₁N₅
+              </span>
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-white mt-2">
+              Type 2 Diabetes Clinical Trial Endpoint Analytics (ST-001)
+            </h2>
+            <p className="text-xs text-slate-300 max-w-2xl">
+              Empirical 50-participant dataset evaluating glycemic control, renal OCT2 tubular clearance, and safety profiles across 50mg, 100mg, and 150mg titration cohorts.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
+            {onNavigate && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => onNavigate('simulation-lab')}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold gap-1.5 shadow-sm"
+                >
+                  <TestTube2 className="h-3.5 w-3.5" />
+                  3D Renal Simulation Lab
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onNavigate('reports')}
+                  className="border-slate-600 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold gap-1.5"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Full PK/PD Reports
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* 4 Key Endpoint Highlights */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+          <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 backdrop-blur-sm">
+            <span className="text-[11px] text-slate-400 font-medium block">Primary Glycemic Efficacy</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-bold text-emerald-400">{clinicalEfficacy.overall.meanHba1cChange}%</span>
+              <span className="text-xs text-slate-300 font-mono">ΔHbA1c</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Baseline {clinicalEfficacy.overall.meanBaselineHba1c}% → Wk 12 {clinicalEfficacy.overall.meanWeek12Hba1c}%
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 backdrop-blur-sm">
+            <span className="text-[11px] text-slate-400 font-medium block">Fasting Plasma Glucose (FPG)</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-bold text-teal-400">{clinicalEfficacy.overall.meanFpgChange}</span>
+              <span className="text-xs text-slate-300 font-mono">mg/dL</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Baseline {clinicalEfficacy.overall.meanBaselineFpg} → Wk 12 {clinicalEfficacy.overall.meanWeek12Fpg} mg/dL
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 backdrop-blur-sm">
+            <span className="text-[11px] text-slate-400 font-medium block">Renal Tubular Clearance</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-bold text-cyan-400">{pkMetrics.meanClearance}</span>
+              <span className="text-xs text-slate-300 font-mono">L/h</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {pkMetrics.meanRenalExcretion}% Urinary Excretion (Half-life {pkMetrics.meanHalfLife}h)
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 backdrop-blur-sm">
+            <span className="text-[11px] text-slate-400 font-medium block">Safety & Tolerance Rate</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-bold text-amber-400">{(100 - safetyMetrics.aePercentage).toFixed(1)}%</span>
+              <span className="text-xs text-slate-300">AE-Free</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {safetyMetrics.aeCount} AEs logged · 0 Liver Toxicity (Normal ALT/AST)
+            </p>
+          </div>
+        </div>
+
+        {/* Dose Titration Cohort Grid */}
+        <div className="mt-5 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Dose Cohort Titration Performance (N=50)
+            </span>
+            <span className="text-xs text-slate-400 font-mono">
+              OCT2 Renal Secretion Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            {clinicalEfficacy.byDose.map((cohort) => {
+              const pkCohort = pkMetrics.dosePk.find((c) => c.dose === cohort.dose);
+              return (
+                <div
+                  key={cohort.dose}
+                  className="rounded-xl bg-white/5 border border-white/10 p-3 hover:bg-white/10 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-blue-300">{cohort.dose} Cohort</span>
+                    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-200">
+                      {cohort.count} Participants
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-white/10">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">ΔHbA1c Drop</span>
+                      <span className="font-bold text-emerald-400">{cohort.hba1cChange}%</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">ΔFPG Drop</span>
+                      <span className="font-bold text-teal-400">{cohort.fpgChange} mg/dL</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Peak Cmax</span>
+                      <span className="font-semibold text-slate-200">{pkCohort?.cmax || cohort.cmax} ng/mL</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Systemic AUC</span>
+                      <span className="font-semibold text-slate-200">{pkCohort?.auc || cohort.auc} ng·h/mL</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Primary Section: Research Decisions Requiring Your Review */}

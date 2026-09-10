@@ -22,6 +22,6 @@ class TaskInDB(TaskBase):
 
 class TaskResponse(TaskBase):
     id: str = Field(validation_alias=AliasChoices("_id", "id"))
-    created_by: str
-    created_at: datetime
-    model_config = ConfigDict(populate_by_name=True)
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")

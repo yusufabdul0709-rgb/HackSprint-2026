@@ -2,7 +2,15 @@ import logging
 from pymongo import MongoClient
 from pymongo.database import Database
 from app.core.config import settings
+import certifi
 import dns.resolver
+
+# Configure public DNS resolvers to bypass Windows UDP 53 DNS timeouts on local networks
+try:
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+except Exception:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +39,13 @@ def startup_connect():
 
     for uri in uris:
         try:
-            logger.info(f"Attempting MongoDB connection...")
+            logger.info("Attempting MongoDB connection...")
             client = MongoClient(
                 uri,
-                serverSelectionTimeoutMS=4000,
-                connectTimeoutMS=4000,
-                socketTimeoutMS=4000
+                tlsCAFile=certifi.where(),
+                serverSelectionTimeoutMS=8000,
+                connectTimeoutMS=8000,
+                socketTimeoutMS=8000
             )
             client.admin.command('ping')
             db_instance.client = client
@@ -66,6 +75,8 @@ def shutdown_disconnect():
             pass
 
 def get_db() -> Database:
+    if not db_instance.is_connected or db_instance.db is None:
+        startup_connect()
     if not db_instance.is_connected or db_instance.db is None:
         from fastapi import HTTPException
         raise HTTPException(

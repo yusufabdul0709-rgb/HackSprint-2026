@@ -88,6 +88,7 @@ const navConfigs: Record<Role, NavItem[]> = {
   RESEARCH_COORDINATOR: [
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { key: 'my-studies', label: 'My Studies', icon: FlaskConical },
+    { key: 'simulation-lab', label: 'Simulation Lab', icon: TestTube2 },
     { key: 'candidates', label: 'Candidates', icon: Users },
     { key: 'screening', label: 'Screening', icon: Brain },
     { key: 'consent', label: 'Consent', icon: FileSignature },

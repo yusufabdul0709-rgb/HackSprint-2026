@@ -21,6 +21,6 @@ class DocumentInDB(DocumentBase):
 
 class DocumentResponse(DocumentBase):
     id: str = Field(validation_alias=AliasChoices("_id", "id"))
-    uploaded_by: str
-    created_at: datetime
-    model_config = ConfigDict(populate_by_name=True)
+    uploaded_by: Optional[str] = None
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")

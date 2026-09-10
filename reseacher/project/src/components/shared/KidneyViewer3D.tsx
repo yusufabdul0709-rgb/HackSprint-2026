@@ -14,17 +14,31 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
+// Helper to detect if a mesh is part of the kidneys / renal organ
+const isKidneyOrgan = (name: string) => {
+  const n = name.toLowerCase();
+  return (
+    n.includes('kidney') ||
+    n.includes('renal') ||
+    n.includes('nephr')
+  );
+};
+
 // Model loader component
 function KidneyModel({ 
   highlightRegion, 
   wireframe, 
   doseImpact,
-  autoRotate 
+  autoRotate,
+  isolateKidneys,
+  tissueOpacity
 }: { 
   highlightRegion: string | null; 
   wireframe: boolean; 
   doseImpact: number;
   autoRotate: boolean;
+  isolateKidneys: boolean;
+  tissueOpacity: number;
 }) {
   const { scene } = useGLTF('/kidney.glb');
   const groupRef = useRef<THREE.Group>(null);
@@ -42,31 +56,46 @@ function KidneyModel({
     return clone;
   }, [scene]);
 
-  // Dynamic visual adjustments based on dose impact and highlight
+  // Dynamic visual adjustments:
+  // Affected organ (Kidneys) highlighted as RED color; remaining anatomy normal
   React.useEffect(() => {
     clonedScene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
-        if (mesh.material) {
-          const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
-          mat.wireframe = wireframe;
-          
-          if (highlightRegion) {
-            mat.emissive = new THREE.Color(0x3b82f6);
-            mat.emissiveIntensity = 0.45;
-          } else if (doseImpact > 0) {
-            // Visualize drug uptake effect: subtle bioluminescent emission
-            mat.emissive = new THREE.Color(0x10b981);
-            mat.emissiveIntensity = doseImpact * 0.5;
+        const isKidney = isKidneyOrgan(mesh.name);
+
+        if (isKidney) {
+          // AFFECTED PART: Kidneys highlighted in vivid RED color
+          const redMat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color('#ef4444'), // Red
+            emissive: new THREE.Color('#dc2626'), // Emissive red glow
+            emissiveIntensity: 0.85 + (doseImpact * 0.25),
+            roughness: 0.3,
+            metalness: 0.15,
+            wireframe: wireframe,
+          });
+          mesh.material = redMat;
+          mesh.visible = true;
+        } else {
+          // REMAINING PART: Normal anatomical appearance with tissue context
+          if (isolateKidneys) {
+            mesh.visible = false;
           } else {
-            mat.emissive = new THREE.Color(0x000000);
-            mat.emissiveIntensity = 0;
+            mesh.visible = true;
+            if (mesh.material) {
+              const normalMat = (mesh.material as THREE.MeshStandardMaterial).clone();
+              normalMat.wireframe = wireframe;
+              normalMat.emissive = new THREE.Color(0x000000);
+              normalMat.emissiveIntensity = 0;
+              normalMat.transparent = true;
+              normalMat.opacity = tissueOpacity;
+              mesh.material = normalMat;
+            }
           }
-          mesh.material = mat;
         }
       }
     });
-  }, [clonedScene, highlightRegion, wireframe, doseImpact]);
+  }, [clonedScene, highlightRegion, wireframe, doseImpact, isolateKidneys, tissueOpacity]);
 
   useFrame((_, delta) => {
     if (autoRotate && groupRef.current) {
@@ -88,9 +117,9 @@ function ModelLoader() {
   return (
     <Html center>
       <div className="flex flex-col items-center justify-center p-4 bg-white/90 backdrop-blur-md rounded-xl border border-slate-200/80 shadow-md">
-        <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
-        <p className="mt-2 text-xs font-semibold text-slate-700">Loading 3D Renal Model...</p>
-        <p className="text-[10px] text-slate-400">Rendering high-res mesh</p>
+        <RefreshCw className="h-6 w-6 text-red-600 animate-spin" />
+        <p className="mt-2 text-xs font-semibold text-slate-700">Loading 3D Kidney Model...</p>
+        <p className="text-[10px] text-slate-400">Rendering kidney.glb with red highlights</p>
       </div>
     </Html>
   );
@@ -101,15 +130,21 @@ export interface KidneyViewer3DProps {
   description?: string;
   studyName?: string;
   initialDose?: number;
+  formula?: string;
+  condition?: string;
 }
 
 export function KidneyViewer3D({
-  description = 'Interactive 3D renal anatomy and clearance dynamics.',
-  studyName = 'Clinical Trial Assessment',
-  initialDose = 0.65
+  description = 'Affected part (Kidneys) highlighted in red for Type 2 Diabetes molecular trial.',
+  studyName = 'Type 2 Diabetes Study',
+  initialDose = 0.65,
+  formula = 'C₄H₁₁N₅',
+  condition = 'Type 2 Diabetes'
 }: KidneyViewer3DProps) {
   const [wireframe, setWireframe] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [isolateKidneys, setIsolateKidneys] = useState(false);
+  const [tissueOpacity, setTissueOpacity] = useState(0.35);
   const [selectedStructure, setSelectedStructure] = useState<string | null>('Renal Cortex');
   const [dose, setDose] = useState(initialDose);
   const [activeView, setActiveView] = useState<'anterior' | 'posterior' | 'lateral'>('anterior');
@@ -118,27 +153,27 @@ export function KidneyViewer3D({
   const structures = [
     {
       name: 'Renal Cortex',
-      role: 'Primary filtration zone containing ~1M nephrons & glomeruli.',
+      role: 'Primary glomerular filtration zone receiving C4H11N5 (Metformin).',
       biomarker: 'eGFR: 88 mL/min/1.73m²',
-      relevance: 'Key region for GLP-1 and SGLT2 targeted therapeutics.'
+      relevance: 'Target region for filtration and glucose homeostasis.'
     },
     {
       name: 'Renal Medulla & Pyramids',
-      role: 'Urine concentration, loop of Henle, electrolyte exchange.',
-      biomarker: 'Osmolality: 650 mOsm/kg',
-      relevance: 'Monitored for potential nephrotoxic accumulation during trial.'
+      role: 'Proximal tubular secretion via Organic Cation Transporters (OCT2/MATE1).',
+      biomarker: 'Tubular Secretion: Active',
+      relevance: 'Key site where C4H11N5 is actively excreted unchanged in urine.'
     },
     {
       name: 'Renal Pelvis & Calyces',
-      role: 'Collecting funnel channeling filtered fluid into ureter.',
-      biomarker: 'Clearance rate: Normal',
-      relevance: 'Evaluated for fluid retention and crystal precipitation risks.'
+      role: 'Urine collection chamber draining cleared drug metabolites.',
+      biomarker: 'Urinary Clearance: 90% in 24h',
+      relevance: 'Monitored for rapid unchanged drug clearance without crystal formation.'
     },
     {
       name: 'Renal Artery & Perfusion',
-      role: 'High-pressure vascular input supplying ~20% of cardiac output.',
-      biomarker: 'Renal Blood Flow: 1.15 L/min',
-      relevance: 'Crucial for rapid systemic delivery and pharmacokinetic peak (Cmax).'
+      role: 'High-volume vascular supply delivering systemic C4H11N5.',
+      biomarker: 'Renal Blood Flow: 1.18 L/min',
+      relevance: 'Determines peak plasma exposure (Cmax) and safe tissue distribution.'
     }
   ];
 
@@ -149,18 +184,34 @@ export function KidneyViewer3D({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-            <h2 className="text-base font-semibold text-slate-900">3D Renal Simulation & Anatomy Lab</h2>
-            <span className="rounded-full bg-blue-50 border border-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700">
-              WebGL 3D (kidney.glb)
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+            <h2 className="text-base font-semibold text-slate-900">3D Simulation: Kidneys (Affected Target)</h2>
+            <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-bold text-red-700">
+              Red Highlighted Organ
+            </span>
+            <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-mono font-bold text-blue-700">
+              Formula: {formula}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-slate-500">{studyName} · {description}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {studyName} · {condition} · Kidneys highlighted in red, remaining anatomy normal
+          </p>
         </div>
 
         {/* View Controls Toolbar */}
-        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+        <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-auto">
+          <Button
+            size="sm"
+            variant={isolateKidneys ? 'default' : 'outline'}
+            onClick={() => setIsolateKidneys(!isolateKidneys)}
+            className="h-8 text-xs gap-1.5"
+            title="Toggle Kidneys Only vs Full Anatomical Context"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            {isolateKidneys ? 'Kidneys Only' : 'Show Context'}
+          </Button>
+
           <Button
             size="sm"
             variant={autoRotate ? 'default' : 'outline'}
@@ -179,23 +230,22 @@ export function KidneyViewer3D({
             className="h-8 text-xs gap-1.5"
             title="Toggle Mesh Wireframe"
           >
-            <Layers className="h-3.5 w-3.5" />
-            {wireframe ? 'Mesh Wireframe' : 'Surface'}
+            {wireframe ? 'Wireframe' : 'Surface'}
           </Button>
         </div>
       </div>
 
       {/* Main 3D Canvas Area */}
-      <div className="relative mt-4 h-[360px] w-full rounded-xl overflow-hidden bg-gradient-to-b from-slate-900 via-zinc-900 to-black border border-slate-800">
+      <div className="relative mt-4 h-[380px] w-full rounded-xl overflow-hidden bg-gradient-to-b from-slate-950 via-zinc-900 to-black border border-slate-800">
         {/* Floating 3D Canvas */}
         <Canvas
-          camera={{ position: [0, 0, 5], fov: 45 }}
+          camera={{ position: [0, 0, 5.2], fov: 45 }}
           className="h-full w-full cursor-grab active:cursor-grabbing"
         >
-          <ambientLight intensity={0.8} />
-          <directionalLight position={[10, 10, 5]} intensity={1.5} castShadow />
-          <directionalLight position={[-10, -10, -5]} intensity={0.6} color="#38bdf8" />
-          <pointLight position={[0, 5, 0]} intensity={1} color="#ffffff" />
+          <ambientLight intensity={0.9} />
+          <directionalLight position={[10, 10, 5]} intensity={1.8} castShadow />
+          <directionalLight position={[-10, -10, -5]} intensity={0.7} color="#ef4444" />
+          <pointLight position={[0, 4, 0]} intensity={1.2} color="#ffffff" />
           
           <Suspense fallback={<ModelLoader />}>
             <KidneyModel
@@ -203,26 +253,31 @@ export function KidneyViewer3D({
               wireframe={wireframe}
               doseImpact={dose}
               autoRotate={autoRotate}
+              isolateKidneys={isolateKidneys}
+              tissueOpacity={tissueOpacity}
             />
           </Suspense>
 
           <OrbitControls 
             enablePan={false}
-            minDistance={2.5}
-            maxDistance={8}
+            minDistance={2.2}
+            maxDistance={8.5}
             rotateSpeed={0.8}
           />
         </Canvas>
 
         {/* Overlay Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
-          <div className="flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white border border-white/10">
-            <Eye className="h-3 w-3 text-blue-400" />
-            Interactive 3D Model: Drag to orbit, scroll to zoom
+          <div className="flex items-center gap-1.5 rounded-lg bg-black/75 backdrop-blur-md px-2.5 py-1 text-[11px] font-medium text-white border border-red-500/40 shadow-lg">
+            <span className="h-2 w-2 rounded-full bg-red-500" />
+            <span>Effected Part: <strong>Kidneys (Highlighted Red)</strong></span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-md px-2.5 py-1 text-[10px] text-emerald-300 border border-emerald-500/20">
+          <div className="flex items-center gap-1.5 rounded-lg bg-black/70 backdrop-blur-md px-2.5 py-1 text-[10px] text-zinc-300 border border-white/10">
+            <span>Remaining Anatomy: Normal tissues</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-lg bg-black/70 backdrop-blur-md px-2.5 py-1 text-[10px] text-blue-300 border border-blue-500/20">
             <Sparkles className="h-3 w-3" />
-            Biomarker Uptake: {(dose * 100).toFixed(0)}% Perfusion
+            Active Compound: Metformin ({formula})
           </div>
         </div>
 
@@ -235,7 +290,7 @@ export function KidneyViewer3D({
               className={cn(
                 'px-2.5 py-1 rounded text-[10px] font-medium capitalize transition-all',
                 activeView === view
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-red-600 text-white shadow-sm'
                   : 'text-zinc-300 hover:bg-white/10'
               )}
             >
@@ -319,8 +374,8 @@ export function KidneyViewer3D({
           <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-xs">
             <div>
               <div className="flex justify-between mb-1.5">
-                <span className="font-semibold text-slate-800">Simulated Therapeutic Concentration (GLP-1 / Compound X)</span>
-                <span className="font-bold text-blue-600">{(dose * 100).toFixed(0)}% Nominal Dose</span>
+                <span className="font-semibold text-slate-800">Simulated Renal Clearance & Concentration (Metformin · C₄H₁₁N₅)</span>
+                <span className="font-bold text-red-600">{(dose * 100).toFixed(0)}% Nominal Dose</span>
               </div>
               <input
                 type="range"
@@ -329,25 +384,25 @@ export function KidneyViewer3D({
                 step="0.05"
                 value={dose}
                 onChange={(e) => setDose(parseFloat(e.target.value))}
-                className="w-full accent-blue-600 cursor-pointer"
+                className="w-full accent-red-600 cursor-pointer"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="rounded-lg bg-white p-2.5 border border-slate-200/70">
-                <p className="text-[10px] text-slate-400 font-medium">Predicted Half-life (t½)</p>
-                <p className="text-sm font-bold text-slate-800 mt-0.5">14.2 Hours</p>
-                <span className="text-[10px] text-emerald-600">Stable steady state</span>
+                <p className="text-[10px] text-slate-400 font-medium">Clearance Pathway</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">Renal (90% unch.)</p>
+                <span className="text-[10px] text-emerald-600 font-medium">Via OCT2 / MATE transporters</span>
               </div>
               <div className="rounded-lg bg-white p-2.5 border border-slate-200/70">
-                <p className="text-[10px] text-slate-400 font-medium">Renal Elimination</p>
-                <p className="text-sm font-bold text-slate-800 mt-0.5">{((1 - dose * 0.15) * 92).toFixed(1)}%</p>
-                <span className="text-[10px] text-blue-600">Within protocol safety</span>
+                <p className="text-[10px] text-slate-400 font-medium">Glomerular Filtration Safety</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{((1 - dose * 0.1) * 94).toFixed(1)}% eGFR</p>
+                <span className="text-[10px] text-blue-600 font-medium">No tubular injury detected</span>
               </div>
               <div className="rounded-lg bg-white p-2.5 border border-slate-200/70">
-                <p className="text-[10px] text-slate-400 font-medium">Toxicity Index</p>
-                <p className="text-sm font-bold text-slate-800 mt-0.5">Low (&lt; 0.04)</p>
-                <span className="text-[10px] text-emerald-600">Zero tubular injury</span>
+                <p className="text-[10px] text-slate-400 font-medium">C₄H₁₁N₅ Accumulation Risk</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">Low (&lt; 0.02)</p>
+                <span className="text-[10px] text-emerald-600 font-medium">Zero lactic acidosis risk</span>
               </div>
             </div>
           </div>

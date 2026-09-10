@@ -83,11 +83,11 @@ export function ParticipantsPage() {
                 <th className="px-4 py-3 text-left font-medium">Participant ID</th>
                 <th className="px-4 py-3 text-left font-medium">Name</th>
                 <th className="px-4 py-3 text-left font-medium">Age</th>
-                <th className="px-4 py-3 text-left font-medium">Study</th>
+                <th className="px-4 py-3 text-left font-medium">Dose Cohort</th>
+                <th className="px-4 py-3 text-left font-medium">HbA1c & Renal Clear.</th>
                 <th className="px-4 py-3 text-left font-medium">Screening</th>
                 <th className="px-4 py-3 text-left font-medium">Consent</th>
                 <th className="px-4 py-3 text-left font-medium">Enrollment</th>
-                <th className="px-4 py-3 text-left font-medium">Last Activity</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -97,25 +97,44 @@ export function ParticipantsPage() {
                   key={p.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: i * 30 }}
+                  transition={{ delay: i * 20 }}
                   className="hover:bg-slate-50 cursor-pointer transition-colors"
                   onClick={() => setSelected(p)}
                 >
-                  <td className="px-4 py-3 text-xs font-medium text-slate-700">{p.id}</td>
+                  <td className="px-4 py-3 text-xs font-mono font-bold text-slate-800">{p.id}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
                         {p.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <span className="text-sm font-medium text-slate-800">{p.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{p.age}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500 max-w-[120px] truncate">{p.studyName}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600">{p.age}y · {p.gender}</td>
+                  <td className="px-4 py-3">
+                    {p.clinicalData ? (
+                      <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-bold text-blue-800">
+                        {p.clinicalData.doseMg} mg
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    {p.clinicalData ? (
+                      <div>
+                        <span className="font-semibold text-slate-800">{p.clinicalData.baselineHba1c}%</span>
+                        <span className="text-slate-400 mx-1">→</span>
+                        <span className="font-bold text-emerald-600">{p.clinicalData.week12Hba1c}%</span>
+                        <span className="text-[10px] text-slate-400 block">{p.clinicalData.renalExcretion}% renal exc.</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><StatusBadge status={p.screeningStatus} /></td>
                   <td className="px-4 py-3"><StatusBadge status={p.consentStatus} /></td>
                   <td className="px-4 py-3"><StatusBadge status={p.enrollmentStatus} /></td>
-                  <td className="px-4 py-3 text-xs text-slate-400">{p.lastActivity}</td>
                   <td className="px-4 py-3"><ChevronRight className="h-4 w-4 text-slate-300" /></td>
                 </motion.tr>
               ))}
@@ -200,13 +219,149 @@ function ParticipantDetailSheet({ participant, onClose, visits, tasks, consent, 
               </div>
 
               {/* Tabs */}
-              <Tabs defaultValue="overview">
-                <TabsList className="w-full justify-start">
+              <Tabs defaultValue="clinical">
+                <TabsList className="w-full justify-start overflow-x-auto">
+                  <TabsTrigger value="clinical">PK/PD & Biomarkers</TabsTrigger>
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="screening">Screening</TabsTrigger>
                   <TabsTrigger value="visits">Visits</TabsTrigger>
                   <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 </TabsList>
+
+                {participant.clinicalData && (
+                  <TabsContent value="clinical" className="space-y-4">
+                    {/* Glycemic Efficacy Card */}
+                    <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-white p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                          <Activity className="h-4 w-4 text-blue-600" />
+                          Glycemic Efficacy Response
+                        </h4>
+                        <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
+                          {participant.clinicalData.doseMg} mg/day Cohort
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg bg-white border border-slate-200/80">
+                          <p className="text-[11px] text-slate-500 font-medium">HbA1c Reduction</p>
+                          <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-base font-bold text-slate-900">{participant.clinicalData.baselineHba1c}%</span>
+                            <span className="text-xs text-slate-400">→</span>
+                            <span className="text-base font-bold text-emerald-600">{participant.clinicalData.week12Hba1c}%</span>
+                          </div>
+                          <span className="text-xs font-bold text-emerald-700 mt-0.5 block">
+                            Change: {participant.clinicalData.hba1cChange}%
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-white border border-slate-200/80">
+                          <p className="text-[11px] text-slate-500 font-medium">Fasting Plasma Glucose (FPG)</p>
+                          <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-base font-bold text-slate-900">{participant.clinicalData.baselineFpg}</span>
+                            <span className="text-xs text-slate-400">→</span>
+                            <span className="text-base font-bold text-emerald-600">{participant.clinicalData.week12Fpg}</span>
+                            <span className="text-[10px] text-slate-400">mg/dL</span>
+                          </div>
+                          <span className="text-xs font-bold text-emerald-700 mt-0.5 block">
+                            Change: {participant.clinicalData.fpgChange} mg/dL
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pharmacokinetics Grid */}
+                    <div className="rounded-xl border border-slate-200/80 p-4 space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <FlaskConical className="h-4 w-4 text-purple-600" />
+                        Pharmacokinetic (PK) Profile
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Peak Plasma (Cmax)</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.cmax} ng/mL</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Time to Peak (Tmax)</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.tmax} hrs</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Exposure (AUC 0-24)</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.auc024} ng·h/mL</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Total Clearance</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.clearanceLh} L/h</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Elimination Half-Life</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.halfLifeH} hrs</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Bioavailability (F)</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.bioavailability}%</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Dist. Volume (Vd)</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.vdLkg} L/kg</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Protein Binding</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.proteinBinding}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Renal & Metabolism */}
+                    <div className="rounded-xl border border-red-100 bg-red-50/20 p-4 space-y-2.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-800 flex items-center gap-1.5">
+                        <Activity className="h-4 w-4 text-red-600" />
+                        Renal Excretion & Metabolism
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <div className="p-2.5 rounded-lg bg-white border border-red-100">
+                          <span className="text-[10px] text-slate-500 block">Renal Excretion</span>
+                          <span className="font-bold text-red-600 text-sm">{participant.clinicalData.renalExcretion}%</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block">Dominant Route</span>
+                          <span className="font-semibold text-slate-800">{participant.clinicalData.dominantRoute}</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block">Primary Enzyme</span>
+                          <span className="font-semibold text-slate-800">{participant.clinicalData.primaryEnzyme}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Safety Assessment */}
+                    <div className="rounded-xl border border-slate-200/80 p-4 space-y-2.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Safety & Adverse Event Status</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Liver ALT</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.alt} U/L (Normal)</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Liver AST</span>
+                          <span className="font-bold text-slate-900">{participant.clinicalData.ast} U/L (Normal)</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Hypoglycemia Event</span>
+                          <span className={cn('font-bold', participant.clinicalData.hypoglycemiaEvent ? 'text-amber-600' : 'text-emerald-600')}>
+                            {participant.clinicalData.hypoglycemiaEvent ? 'Reported (Mild)' : 'None'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-500 block">Adverse Event</span>
+                          <span className={cn('font-bold', participant.clinicalData.adverseEvent ? 'text-red-600' : 'text-emerald-600')}>
+                            {participant.clinicalData.adverseEvent ? `Reported (${participant.clinicalData.aeSeverity})` : 'None'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                )}
 
                 <TabsContent value="overview" className="space-y-3">
                   <div className="rounded-xl border border-slate-100 p-4">

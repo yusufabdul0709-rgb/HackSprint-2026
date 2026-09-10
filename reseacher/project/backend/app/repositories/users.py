@@ -7,7 +7,11 @@ def create(db, user_data: dict) -> dict:
     return user_data
 
 def get_by_id(db, user_id: str) -> Optional[dict]:
-    user = db.users.find_one({"_id": ObjectId(user_id)})
+    try:
+        query = {"_id": ObjectId(user_id)}
+    except Exception:
+        query = {"_id": user_id}
+    user = db.users.find_one(query)
     if user:
         user["_id"] = str(user["_id"])
     return user
@@ -25,9 +29,17 @@ def list_all(db) -> List[dict]:
     return users
 
 def update(db, user_id: str, update_data: dict) -> bool:
-    result = db.users.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
+    try:
+        query = {"_id": ObjectId(user_id)}
+    except Exception:
+        query = {"_id": user_id}
+    result = db.users.update_one(query, {"$set": update_data})
     return result.modified_count > 0
 
 def delete(db, user_id: str) -> bool:
-    result = db.users.delete_one({"_id": ObjectId(user_id)})
+    try:
+        query = {"_id": ObjectId(user_id)}
+    except Exception:
+        query = {"_id": user_id}
+    result = db.users.delete_one(query)
     return result.deleted_count > 0

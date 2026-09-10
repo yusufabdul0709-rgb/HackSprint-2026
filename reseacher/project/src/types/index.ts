@@ -93,6 +93,34 @@ export interface ScreeningResult {
   detail: string;
 }
 
+export interface ClinicalTrialData {
+  weightKg: number;
+  bmi: number;
+  baselineHba1c: number;
+  baselineFpg: number;
+  doseMg: number;
+  cmax: number;
+  tmax: number;
+  auc024: number;
+  bioavailability: number;
+  vdLkg: number;
+  proteinBinding: number;
+  clearanceLh: number;
+  halfLifeH: number;
+  primaryEnzyme: string;
+  renalExcretion: number;
+  dominantRoute: string;
+  alt: number;
+  ast: number;
+  hypoglycemiaEvent: boolean;
+  adverseEvent: boolean;
+  aeSeverity: 'None' | 'Mild' | 'Moderate' | 'Severe';
+  week12Hba1c: number;
+  hba1cChange: number;
+  week12Fpg: number;
+  fpgChange: number;
+}
+
 export interface Participant {
   id: string;
   name: string;
@@ -114,6 +142,7 @@ export interface Participant {
   screeningReviewedBy?: string;
   screeningReviewedDate?: string;
   screeningNotes?: string;
+  clinicalData?: ClinicalTrialData;
 }
 
 export interface Visit {

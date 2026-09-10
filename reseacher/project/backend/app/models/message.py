@@ -20,5 +20,5 @@ class MessageInDB(MessageBase):
 
 class MessageResponse(MessageBase):
     id: str = Field(validation_alias=AliasChoices("_id", "id"))
-    sent_at: datetime
-    model_config = ConfigDict(populate_by_name=True)
+    sent_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")

@@ -9,6 +9,7 @@ class ClinicalAttributes(BaseModel):
     medications: Optional[list] = []
     lab_results: Optional[Dict[str, Any]] = {}
     vital_signs: Optional[Dict[str, Any]] = {}
+    model_config = ConfigDict(extra="allow")
 
 class ParticipantBase(BaseModel):
     participant_code: str
@@ -16,7 +17,9 @@ class ParticipantBase(BaseModel):
     site_id: Optional[str] = None
     user_id: Optional[str] = None
     status: str = "ACTIVE"
-    clinical_attributes: ClinicalAttributes = Field(default_factory=ClinicalAttributes)
+    clinical_attributes: Dict[str, Any] = Field(default_factory=dict)
+    clinicalData: Optional[Dict[str, Any]] = None
+    model_config = ConfigDict(extra="allow")
 
 class ParticipantCreate(ParticipantBase):
     pass
@@ -29,8 +32,22 @@ class ParticipantInDB(ParticipantBase):
 
 class ParticipantResponse(ParticipantBase):
     id: str = Field(validation_alias=AliasChoices("_id", "id"))
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    studyId: Optional[str] = None
+    study_id: Optional[str] = None
+    studyName: Optional[str] = None
+    study_name: Optional[str] = None
+    screeningStatus: Optional[str] = "approved"
+    consentStatus: Optional[str] = "consented"
+    enrollmentStatus: Optional[str] = "enrolled"
+    lastActivity: Optional[str] = None
     created_at: datetime
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 class StudyParticipantBase(BaseModel):
     participant_id: str

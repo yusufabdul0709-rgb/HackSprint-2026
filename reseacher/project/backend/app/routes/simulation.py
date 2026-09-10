@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List
 from app.db.mongodb import get_db
 from app.core.security import get_current_user
+from app.core.permissions import require_role
 from app.models.simulation import SimulationCreate, SimulationResponse, SimulationResultInDB
 from bson import ObjectId
 from datetime import datetime
@@ -11,7 +12,11 @@ import random
 router = APIRouter()
 
 @router.post("/", response_model=SimulationResponse)
-def run_sim(sim_in: SimulationCreate, db = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def run_sim(
+    sim_in: SimulationCreate,
+    db = Depends(get_db),
+    current_user: dict = Depends(require_role("PRINCIPAL_INVESTIGATOR", "RESEARCH_COORDINATOR"))
+):
     s_data = sim_in.model_dump()
     s_data["created_by"] = current_user["id"]
     s_data["created_at"] = datetime.utcnow()
@@ -35,13 +40,20 @@ def run_sim(sim_in: SimulationCreate, db = Depends(get_db), current_user: dict =
     return s_data
 
 @router.get("/", response_model=List[SimulationResponse])
-def list_sims(db = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def list_sims(
+    db = Depends(get_db),
+    current_user: dict = Depends(require_role("PRINCIPAL_INVESTIGATOR", "RESEARCH_COORDINATOR"))
+):
     sims = list(db.simulations.find({"created_by": current_user["id"]}))
     for s in sims: s["_id"] = str(s["_id"])
     return sims
 
 @router.get("/{id}/results")
-def get_sim_results(id: str, db = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_sim_results(
+    id: str,
+    db = Depends(get_db),
+    current_user: dict = Depends(require_role("PRINCIPAL_INVESTIGATOR", "RESEARCH_COORDINATOR"))
+):
     res = db.simulation_results.find_one({"simulation_id": id})
     if not res:
         raise HTTPException(status_code=404, detail="Not found")
@@ -55,7 +67,10 @@ class DoseResponseRequest(BaseModel):
     treatment_weeks: int = 24
 
 @router.post("/dose-response")
-def run_dose_response(req: DoseResponseRequest, current_user: dict = Depends(get_current_user)):
+def run_dose_response(
+    req: DoseResponseRequest,
+    current_user: dict = Depends(require_role("PRINCIPAL_INVESTIGATOR", "RESEARCH_COORDINATOR"))
+):
     from app.services.ai_safeguards_service import simulate_renal_dose_response
     result = simulate_renal_dose_response(
         baseline_egfr=req.baseline_egfr,

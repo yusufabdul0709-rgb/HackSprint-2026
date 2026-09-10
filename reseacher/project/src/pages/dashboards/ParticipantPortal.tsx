@@ -1,6 +1,8 @@
 import { useTrialBridge } from '@/store/TrialBridgeContext';
+import { useAuth } from '@/store/AuthContext';
+import { participants as mockParticipants, studies as mockStudies } from '@/data/mockData';
+import type { Participant } from '@/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { TrialAnatomy } from '@/components/shared/TrialAnatomy';
 import {
   Calendar,
   MapPin,
@@ -23,12 +25,17 @@ interface Props {
 
 export function ParticipantPortal({ onNavigate }: Props) {
   const { participants, visits, documents, messages, studies } = useTrialBridge();
-  const me = participants.find((p) => p.id === 'P00124') || participants[0];
-  const myStudy = studies.find((s) => s.id === me.studyId);
-  const myVisits = visits.filter((v) => v.participantId === me.id);
+  const { user } = useAuth();
+
+  const defaultParticipant: Participant = mockParticipants.find(p => p.id === 'P00124') || mockParticipants[0];
+  const me = participants.find((p) => p.id === 'P00124' || (user?.email && p.email === user.email) || (user?.name && p.name === user.name)) || participants[0] || defaultParticipant;
+  
+  const myStudy = studies.find((s) => s.id === (me?.studyId || defaultParticipant.studyId)) || mockStudies.find((s) => s.id === (me?.studyId || defaultParticipant.studyId)) || studies[0] || mockStudies[0];
+  const myVisits = visits.filter((v) => v.participantId === (me?.id || defaultParticipant.id));
   const upcomingVisit = myVisits.find((v) => v.status === 'scheduled' && v.date >= '2026-09-10');
-  const myDocuments = documents.filter((d) => d.participantId === me.id);
-  const myMessages = messages.filter((m) => m.to === me.name);
+  const myDocuments = documents.filter((d) => d.participantId === (me?.id || defaultParticipant.id));
+  const myMessages = messages.filter((m) => m.to === (me?.name || defaultParticipant.name));
+  const firstName = me?.name ? me.name.split(' ')[0] : (user?.name ? user.name.split(' ')[0] : 'Participant');
 
   return (
     <div className="space-y-6">
@@ -38,7 +45,7 @@ export function ParticipantPortal({ onNavigate }: Props) {
           <Heart className="h-4 w-4" />
           <span className="font-medium">Welcome back</span>
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Welcome, {me.name.split(' ')[0]}</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Welcome, {firstName}</h1>
         <p className="mt-1 text-sm text-slate-500">Your participation makes a difference.</p>
       </div>
 
@@ -51,11 +58,11 @@ export function ParticipantPortal({ onNavigate }: Props) {
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">My Clinical Trial</p>
-              <h2 className="mt-0.5 text-xl font-semibold text-slate-900">{me.studyName}</h2>
+              <h2 className="mt-0.5 text-xl font-semibold text-slate-900">{me?.studyName || myStudy?.name || 'Clinical Trial'}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <StatusBadge status={me.enrollmentStatus} />
+                <StatusBadge status={me?.enrollmentStatus || 'enrolled'} />
                 <span className="text-xs text-slate-500">·</span>
-                <span className="text-xs text-slate-500">Participant ID: {me.id}</span>
+                <span className="text-xs text-slate-500">Participant ID: {me?.id || defaultParticipant.id}</span>
               </div>
             </div>
           </div>
@@ -160,13 +167,29 @@ export function ParticipantPortal({ onNavigate }: Props) {
           </div>
         </div>
 
-        {/* Trial Anatomy */}
+        {/* Clinical Study Information */}
         {myStudy && (
-          <TrialAnatomy
-            organ={myStudy.anatomy || ''}
-            description={myStudy.anatomyDescription || ''}
-            studyName={myStudy.name}
-          />
+          <div className="rounded-2xl border border-slate-200/60 bg-white p-5 animate-fade-in space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <FlaskConical className="h-5 w-5 text-blue-600" />
+              <h2 className="text-base font-semibold text-slate-900">Study Information & Guidance</h2>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Condition & Objectives</p>
+              <p className="text-sm font-medium text-slate-800 mt-1">{myStudy.condition}</p>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">{myStudy.description}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Trial Phase</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">{myStudy.phase}</p>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Lead Investigator</p>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">{myStudy.principalInvestigator}</p>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

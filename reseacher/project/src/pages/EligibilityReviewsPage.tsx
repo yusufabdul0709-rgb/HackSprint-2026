@@ -67,19 +67,19 @@ const initialReviews: ReviewItem[] = [
     id: 'rev-002',
     participantId: 'p-002',
     participantCode: 'P-002',
-    studyId: 'CD-202',
-    studyTitle: 'Cardiac Regeneration & SGLT2 Efficacy',
+    studyId: 'ST-001',
+    studyTitle: 'Type 2 Diabetes Study (C4H11N5 Renal Dynamics)',
     age: 62,
     gender: 'Female',
     aiRecommendation: 'REQUIRES_HUMAN_REVIEW',
     aiConfidence: 78.4,
     coordinatorRecommendation: 'PROCEED',
-    coordinatorNotes: 'Ejection fraction is borderline 38%. PI clinical discretion requested for inclusion.',
+    coordinatorNotes: 'Renal eGFR is borderline 52 mL/min. PI clinical discretion requested for C4H11N5 clearance safety inclusion.',
     status: 'PENDING_PI_REVIEW',
     criteria: [
-      { name: 'Age 40-80', condition: '40 <= Age <= 80', participantValue: '62 years', status: 'MATCH', evidence: 'EHR verified' },
-      { name: 'LVEF <= 40%', condition: 'LVEF <= 40', participantValue: '38%', status: 'REVIEW', evidence: 'Echo report shows 38-41% range' },
-      { name: 'No Arrhythmia (last 6mo)', condition: 'Arrhythmia == False', participantValue: 'Negative', status: 'MATCH', evidence: 'Holter monitor clean' }
+      { name: 'Age 30-65', condition: '30 <= Age <= 65', participantValue: '62 years', status: 'MATCH', evidence: 'EHR verified' },
+      { name: 'eGFR >= 45 mL/min', condition: 'eGFR >= 45', participantValue: '52 mL/min', status: 'REVIEW', evidence: 'Borderline renal filtration rate' },
+      { name: 'HbA1c >= 7.0%', condition: 'HbA1c >= 7.0', participantValue: '7.6%', status: 'MATCH', evidence: 'Recent lab drawn' }
     ]
   },
   {

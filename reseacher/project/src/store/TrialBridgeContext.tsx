@@ -14,6 +14,15 @@ import type {
 } from '@/types';
 import { useAuth } from './AuthContext';
 import api from '@/lib/api';
+import {
+  studies as mockStudies,
+  participants as mockParticipants,
+  visits as mockVisits,
+  tasks as mockTasks,
+  consentRecords as mockConsentRecords,
+  documents as mockDocuments,
+  messages as mockMessages,
+} from '@/data/mockData';
 
 interface TrialBridgeContextType {
   role: Role;
@@ -40,13 +49,13 @@ const TrialBridgeContext = createContext<TrialBridgeContextType | null>(null);
 export function TrialBridgeProvider({ children }: { children: ReactNode }) {
   const { role, isAuthenticated } = useAuth();
   
-  const [studies, setStudies] = useState<Study[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [consentRecords, setConsentRecords] = useState<ConsentRecord[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [studies, setStudies] = useState<Study[]>(mockStudies);
+  const [participants, setParticipants] = useState<Participant[]>(mockParticipants);
+  const [visits, setVisits] = useState<Visit[]>(mockVisits);
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [consentRecords, setConsentRecords] = useState<ConsentRecord[]>(mockConsentRecords);
+  const [documents, setDocuments] = useState<Document[]>(mockDocuments);
+  const [messages, setMessages] = useState<Message[]>(mockMessages);
 
   const fetchInitialData = async () => {
     if (!isAuthenticated) return;
@@ -60,22 +69,22 @@ export function TrialBridgeProvider({ children }: { children: ReactNode }) {
         documentsRes,
         messagesRes
       ] = await Promise.all([
-        api.get('/studies').catch(() => ({ data: [] })),
-        api.get('/participants').catch(() => ({ data: [] })),
-        api.get('/visits').catch(() => ({ data: [] })),
-        api.get('/tasks').catch(() => ({ data: [] })),
-        api.get('/consent-records').catch(() => ({ data: [] })),
-        api.get('/documents').catch(() => ({ data: [] })),
-        api.get('/messages').catch(() => ({ data: [] }))
+        api.get('/studies/').catch(() => ({ data: [] })),
+        api.get('/participants/').catch(() => ({ data: [] })),
+        api.get('/visits/').catch(() => ({ data: [] })),
+        api.get('/tasks/').catch(() => ({ data: [] })),
+        api.get('/consent-records/').catch(() => ({ data: [] })),
+        api.get('/documents/').catch(() => ({ data: [] })),
+        api.get('/messages/').catch(() => ({ data: [] }))
       ]);
 
-      setStudies(studiesRes.data || []);
-      setParticipants(participantsRes.data || []);
-      setVisits(visitsRes.data || []);
-      setTasks(tasksRes.data || []);
-      setConsentRecords(consentRes.data || []);
-      setDocuments(documentsRes.data || []);
-      setMessages(messagesRes.data || []);
+      if (studiesRes.data && studiesRes.data.length > 0) setStudies(studiesRes.data);
+      if (participantsRes.data && participantsRes.data.length > 0) setParticipants(participantsRes.data);
+      if (visitsRes.data && visitsRes.data.length > 0) setVisits(visitsRes.data);
+      if (tasksRes.data && tasksRes.data.length > 0) setTasks(tasksRes.data);
+      if (consentRes.data && consentRes.data.length > 0) setConsentRecords(consentRes.data);
+      if (documentsRes.data && documentsRes.data.length > 0) setDocuments(documentsRes.data);
+      if (messagesRes.data && messagesRes.data.length > 0) setMessages(messagesRes.data);
     } catch (error) {
       console.error('Error fetching initial data', error);
     }

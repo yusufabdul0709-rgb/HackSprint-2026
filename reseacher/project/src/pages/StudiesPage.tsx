@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTrialBridge } from '@/store/TrialBridgeContext';
+import { useAuth } from '@/store/AuthContext';
 import { StatusBadge, ProgressRing } from '@/components/shared/StatusBadge';
 import { TrialAnatomy } from '@/components/shared/TrialAnatomy';
 import {
@@ -26,15 +27,19 @@ import { cn } from '@/lib/utils';
 
 export function StudiesPage() {
   const { studies, addStudy } = useTrialBridge();
+  const { role, user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
+  const isPI = role === 'PRINCIPAL_INVESTIGATOR';
+
   const filtered = studies.filter(
     (s) =>
-      (s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase())) &&
-      (statusFilter === 'all' || s.status === statusFilter)
+      ((s?.name || (s as any)?.title || '').toLowerCase().includes(search.toLowerCase()) || 
+       (s?.id || (s as any)?.study_code || '').toLowerCase().includes(search.toLowerCase())) &&
+      (statusFilter === 'all' || (s?.status || '').toLowerCase() === statusFilter.toLowerCase())
   );
 
   return (
@@ -42,11 +47,20 @@ export function StudiesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Studies</h1>
-          <p className="mt-1 text-sm text-slate-500">Manage your clinical trial studies</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {isPI ? 'Create, configure, and oversee clinical trial protocols.' : 'Browse, read, and conduct active clinical trial research.'}
+          </p>
         </div>
-        <Button onClick={() => setShowCreate(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Create Study
-        </Button>
+        {isPI ? (
+          <Button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+            <Plus className="h-4 w-4" /> Create Study (PI Only)
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 px-3.5 py-1.5 text-xs text-slate-600">
+            <FlaskConical className="h-3.5 w-3.5 text-slate-500" />
+            <span>Study Creation: Exclusive to Principal Investigators</span>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -78,7 +92,9 @@ export function StudiesPage() {
       {/* Study cards grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((study, i) => {
-          const pct = Math.round((study.enrolledParticipants / study.targetParticipants) * 100);
+          const target = study.targetParticipants || 100;
+          const enrolled = study.enrolledParticipants || 0;
+          const pct = Math.min(100, Math.round((enrolled / target) * 100)) || 0;
           return (
             <motion.div
               key={study.id}
@@ -95,21 +111,21 @@ export function StudiesPage() {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-slate-400">{study.id}</p>
-                    <h3 className="text-sm font-semibold text-slate-900">{study.name}</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">{study.name || (study as any).title || 'Clinical Study'}</h3>
                   </div>
                 </div>
                 <StatusBadge status={study.status} />
               </div>
               <p className="mt-3 text-xs text-slate-500 line-clamp-2">{study.description}</p>
               <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {study.researchSite.split(',')[0]}</span>
-                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {study.startDate}</span>
+                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {(study.researchSite || 'City Hospital').split(',')[0]}</span>
+                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {study.startDate || '2026-06-01'}</span>
               </div>
               <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3">
                 <ProgressRing value={pct} size={40} stroke={3} color={pct >= 75 ? '#22C55E' : pct >= 50 ? '#3B82F6' : '#F59E0B'} />
                 <div className="flex-1">
                   <p className="text-xs text-slate-500">Enrollment</p>
-                  <p className="text-sm font-medium text-slate-800">{study.enrolledParticipants} / {study.targetParticipants}</p>
+                  <p className="text-sm font-medium text-slate-800">{enrolled} / {target}</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-300" />
               </div>
@@ -119,25 +135,39 @@ export function StudiesPage() {
       </div>
 
       {/* Study Detail Dialog */}
-      <StudyDetailDialog study={selectedStudy} onClose={() => setSelectedStudy(null)} />
+      <StudyDetailDialog study={selectedStudy} role={role} onClose={() => setSelectedStudy(null)} />
 
-      {/* Create Study Dialog */}
-      <CreateStudyDialog open={showCreate} onClose={() => setShowCreate(false)} onCreate={addStudy} />
+      {/* Create Study Dialog (PI Only) */}
+      {isPI && (
+        <CreateStudyDialog
+          open={showCreate}
+          piName={user?.name || 'Principal Investigator'}
+          onClose={() => setShowCreate(false)}
+          onCreate={addStudy}
+        />
+      )}
     </div>
   );
 }
 
-function StudyDetailDialog({ study, onClose }: { study: Study | null; onClose: () => void }) {
+function StudyDetailDialog({ study, role, onClose }: { study: Study | null; role: string; onClose: () => void }) {
   if (!study) return null;
-  const pct = Math.round((study.enrolledParticipants / study.targetParticipants) * 100);
+  const target = study.targetParticipants || 100;
+  const enrolled = study.enrolledParticipants || 0;
+  const pct = Math.min(100, Math.round((enrolled / target) * 100)) || 0;
+  const canAccess3D = role === 'PRINCIPAL_INVESTIGATOR' || role === 'RESEARCH_COORDINATOR';
+  const studyName = study.name || (study as any).title || 'Clinical Study';
+  const condition = study.condition || study.description || 'Clinical Research';
+  const criteria = study.eligibilityCriteria || [];
+
   return (
     <Dialog open={!!study} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-400">{study.id} · {study.phase}</p>
-              <DialogTitle className="text-xl">{study.name}</DialogTitle>
+              <p className="text-xs font-medium text-slate-400">{study.id} · {study.phase || 'Phase II'}</p>
+              <DialogTitle className="text-xl">{studyName}</DialogTitle>
             </div>
             <StatusBadge status={study.status} />
           </div>
@@ -146,16 +176,28 @@ function StudyDetailDialog({ study, onClose }: { study: Study | null; onClose: (
         <div className="space-y-4">
           <p className="text-sm text-slate-600">{study.description}</p>
 
+          {/* Molecular Formula & Mechanism Banner for Diabetes */}
+          {condition.toLowerCase().includes('diabetes') && (
+            <div className="rounded-xl border border-blue-200/80 bg-blue-50/50 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="h-4 w-4 text-blue-600" />
+                <span className="font-semibold text-slate-900">Active Compound: Metformin</span>
+                <span className="font-mono bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">Formula: C₄H₁₁N₅</span>
+              </div>
+              <span className="text-slate-600 font-medium">Affected Organ: <strong className="text-red-600">Kidneys (Red Highlight)</strong></span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Condition', value: study.condition },
-              { label: 'Sponsor', value: study.sponsor },
-              { label: 'Research Site', value: study.researchSite },
-              { label: 'Principal Investigator', value: study.principalInvestigator },
-              { label: 'Start Date', value: study.startDate },
-              { label: 'End Date', value: study.endDate },
-              { label: 'Target', value: `${study.targetParticipants} participants` },
-              { label: 'Enrolled', value: `${study.enrolledParticipants} participants` },
+              { label: 'Condition', value: condition },
+              { label: 'Sponsor', value: study.sponsor || 'PharmaCo Research' },
+              { label: 'Research Site', value: study.researchSite || 'City Hospital' },
+              { label: 'Principal Investigator', value: study.principalInvestigator || 'Dr. J Patel' },
+              { label: 'Start Date', value: study.startDate || '2026-06-01' },
+              { label: 'End Date', value: study.endDate || '2027-06-01' },
+              { label: 'Target', value: `${target} participants` },
+              { label: 'Enrolled', value: `${enrolled} participants` },
             ].map((item) => (
               <div key={item.label} className="rounded-xl bg-slate-50 p-3">
                 <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
@@ -176,39 +218,47 @@ function StudyDetailDialog({ study, onClose }: { study: Study | null; onClose: (
           </div>
 
           {/* Eligibility Criteria */}
-          <div className="rounded-xl border border-slate-100 p-4">
-            <h3 className="text-sm font-semibold text-slate-900">Eligibility Criteria</h3>
-            <div className="mt-3 space-y-3">
-              <div>
-                <p className="text-xs font-medium text-green-700 mb-2">Inclusion Criteria</p>
-                <div className="space-y-1.5">
-                  {study.eligibilityCriteria.filter(c => c.category === 'inclusion').map((c) => (
-                    <div key={c.id} className="flex items-center gap-2 text-sm text-slate-600">
-                      <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                      {c.field} {c.operator} {c.value}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {study.eligibilityCriteria.some(c => c.category === 'exclusion') && (
+          {criteria.length > 0 && (
+            <div className="rounded-xl border border-slate-100 p-4">
+              <h3 className="text-sm font-semibold text-slate-900">Eligibility Criteria</h3>
+              <div className="mt-3 space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-red-700 mb-2">Exclusion Criteria</p>
+                  <p className="text-xs font-medium text-green-700 mb-2">Inclusion Criteria</p>
                   <div className="space-y-1.5">
-                    {study.eligibilityCriteria.filter(c => c.category === 'exclusion').map((c) => (
+                    {criteria.filter(c => c.category === 'inclusion').map((c) => (
                       <div key={c.id} className="flex items-center gap-2 text-sm text-slate-600">
-                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                         {c.field} {c.operator} {c.value}
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+                {criteria.some(c => c.category === 'exclusion') && (
+                  <div>
+                    <p className="text-xs font-medium text-red-700 mb-2">Exclusion Criteria</p>
+                    <div className="space-y-1.5">
+                      {criteria.filter(c => c.category === 'exclusion').map((c) => (
+                        <div key={c.id} className="flex items-center gap-2 text-sm text-slate-600">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                          {c.field} {c.operator} {c.value}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Trial Anatomy */}
-          {study.anatomy && (
-            <TrialAnatomy organ={study.anatomy} description={study.anatomyDescription || ''} studyName={study.name} />
+          {/* 3D Trial Anatomy - Restricted to PI and Researcher */}
+          {canAccess3D && study.anatomy && (
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">3D Organ Simulation</span>
+                <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded">PI & Researcher Feature</span>
+              </div>
+              <TrialAnatomy organ={study.anatomy} description={study.anatomyDescription || ''} studyName={studyName} />
+            </div>
           )}
         </div>
       </DialogContent>
@@ -216,22 +266,28 @@ function StudyDetailDialog({ study, onClose }: { study: Study | null; onClose: (
   );
 }
 
-function CreateStudyDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (study: Study) => void }) {
+function CreateStudyDialog({ open, piName, onClose, onCreate }: { open: boolean; piName: string; onClose: () => void; onCreate: (study: Study) => void }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    name: '',
-    description: '',
-    condition: '',
-    sponsor: '',
-    researchSite: '',
-    startDate: '',
-    endDate: '',
-    targetParticipants: 50,
-    phase: 'Phase II',
-    anatomy: '',
-    anatomyDescription: '',
+    name: 'Type 2 Diabetes Renal Investigation (C4H11N5)',
+    description: 'A Phase III study evaluating the renal clearance and pharmacokinetic profile of C4H11N5 (Metformin) in adult Type 2 Diabetes patients with mild-to-moderate diabetic nephropathy.',
+    condition: 'Type 2 Diabetes',
+    sponsor: 'PharmaCo Research',
+    researchSite: 'City Hospital, Chennai',
+    startDate: '2026-10-01',
+    endDate: '2027-10-01',
+    targetParticipants: 120,
+    phase: 'Phase III',
+    anatomy: 'Kidneys',
+    anatomyDescription: 'Renal excretion and glomerular filtration of C4H11N5 (Metformin). In 3D simulation, kidneys are highlighted in red.',
   });
-  const [criteria, setCriteria] = useState<EligibilityCriterion[]>([]);
+  const [criteria, setCriteria] = useState<EligibilityCriterion[]>([
+    { id: 'c1', field: 'Age', operator: 'between', value: '30-65', category: 'inclusion' },
+    { id: 'c2', field: 'Condition', operator: 'equals', value: 'Type 2 Diabetes', category: 'inclusion' },
+    { id: 'c3', field: 'HbA1c', operator: '>=', value: '7.0', category: 'inclusion' },
+    { id: 'c4', field: 'eGFR', operator: '>=', value: '45', category: 'inclusion' },
+    { id: 'c5', field: 'Pregnancy', operator: 'equals', value: 'Not pregnant', category: 'exclusion' }
+  ]);
 
   const addCriterion = () => {
     setCriteria([...criteria, {
@@ -258,7 +314,7 @@ function CreateStudyDialog({ open, onClose, onCreate }: { open: boolean; onClose
       enrolledParticipants: 0,
       status: 'recruiting',
       eligibilityCriteria: criteria,
-      principalInvestigator: 'Dr. James Patel',
+      principalInvestigator: piName,
     };
     onCreate(newStudy);
     onClose();

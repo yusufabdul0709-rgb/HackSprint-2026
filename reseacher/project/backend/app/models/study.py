@@ -38,6 +38,17 @@ class StudyInDB(StudyBase):
 
 class StudyResponse(StudyBase):
     id: str = Field(validation_alias=AliasChoices("_id", "id"))
+    name: Optional[str] = None
+    condition: Optional[str] = None
+    sponsor: Optional[str] = None
+    researchSite: Optional[str] = None
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    targetParticipants: Optional[int] = 100
+    enrolledParticipants: Optional[int] = 0
+    principalInvestigator: Optional[str] = None
+    anatomy: Optional[str] = None
+    anatomyDescription: Optional[str] = None
     criteria: List[dict] = []
     created_at: datetime
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")

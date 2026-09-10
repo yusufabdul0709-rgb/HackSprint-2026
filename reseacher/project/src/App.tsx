@@ -54,8 +54,8 @@ function AppContent() {
     switch (role) {
       case 'PLATFORM_ADMIN': return <AdminDashboard />;
       case 'ORGANIZATION': return <SponsorDashboard />;
-      case 'PRINCIPAL_INVESTIGATOR': return <PrincipalInvestigatorDashboard />;
-      case 'RESEARCH_COORDINATOR': return <ResearchCoordinatorDashboard />;
+      case 'PRINCIPAL_INVESTIGATOR': return <PrincipalInvestigatorDashboard onNavigate={setCurrentNav} />;
+      case 'RESEARCH_COORDINATOR': return <ResearchCoordinatorDashboard onNavigate={setCurrentNav} />;
       case 'PARTICIPANT': return <ParticipantPortal onNavigate={setCurrentNav} />;
       default: return <AdminDashboard />;
     }
@@ -89,9 +89,10 @@ function AppContent() {
       case 'eligibility-reviews': return <EligibilityReviewsPage />;
       case 'protocol': return <StudiesPage />;
       case 'study-visits': return <VisitsPage />;
-      case 'approvals': return <EligibilityReviewsPage />;
-      case 'simulation-lab': return <SimulationLabPage />;
-      case 'candidates': return <ParticipantsPage />;
+      case 'simulation-lab': 
+        return (role === 'PRINCIPAL_INVESTIGATOR' || role === 'RESEARCH_COORDINATOR') 
+          ? <SimulationLabPage /> 
+          : <PlaceholderPage title="Access Restricted" description="3D Simulation Lab & Molecular Workbench is restricted strictly to Principal Investigators and Researchers." />;
       case 'follow-ups': return <VisitsPage />;
       case 'my-appointments': return <VisitsPage />;
       case 'my-consent': return <ConsentPage />;

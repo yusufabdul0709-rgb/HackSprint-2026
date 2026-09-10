@@ -19,9 +19,44 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TrialBridge API", lifespan=lifespan)
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+class EnsureCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin")
+        if request.method == "OPTIONS":
+            response = Response(status_code=204)
+        else:
+            try:
+                response = await call_next(request)
+            except Exception as exc:
+                from fastapi.responses import JSONResponse
+                response = JSONResponse(
+                    status_code=500,
+                    content={"detail": "Internal Server Error", "error": str(exc)}
+                )
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
+app.add_middleware(EnsureCORSMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
+    ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +70,7 @@ app.include_router(participants.router, prefix="/api/participants", tags=["parti
 app.include_router(screening.router, prefix="/api/screening", tags=["screening"])
 app.include_router(eligibility.router, prefix="/api/eligibility", tags=["eligibility"])
 app.include_router(consent.router, prefix="/api/consent", tags=["consent"])
+app.include_router(consent.router, prefix="/api/consent-records", tags=["consent-records"])
 app.include_router(enrollment.router, prefix="/api/enrollment", tags=["enrollment"])
 app.include_router(visits.router, prefix="/api/visits", tags=["visits"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
@@ -47,6 +83,8 @@ app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 @app.get("/api/health")
 def health_check():
+    if not db_instance.is_connected:
+        startup_connect()
     if db_instance.is_connected:
         return {"status": "ok", "database": "mongodb", "database_status": "connected"}
     raise HTTPException(
