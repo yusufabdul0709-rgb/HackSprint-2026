@@ -170,13 +170,49 @@ export function SecurityCompliancePage() {
     }
   };
 
+  const [unlockingEmail, setUnlockingEmail] = useState<string | null>(null);
+
+  const handleUnlockAccount = async (targetEmail: string) => {
+    if (!targetEmail) return;
+    try {
+      setUnlockingEmail(targetEmail);
+      const res = await api.post('/admin/security/unlock-account', { email: targetEmail });
+      toast.success(res.data?.message || `Account ${targetEmail} unlocked successfully!`);
+      // Update rbacData locally
+      if (rbacData?.locked_accounts) {
+        setRbacData({
+          ...rbacData,
+          locked_accounts: rbacData.locked_accounts.filter((a: any) => a.email !== targetEmail)
+        });
+      }
+      // Update alertsData locally
+      setAlertsData((prev: any[]) => prev.filter((a: any) => 
+        !a.description?.includes(targetEmail) && a.email !== targetEmail && a.target_user_email !== targetEmail
+      ));
+      // Refresh overview
+      try {
+        const ovRes = await api.get('/admin/security/overview');
+        setOverview(ovRes.data);
+      } catch {}
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to unlock account');
+    } finally {
+      setUnlockingEmail(null);
+    }
+  };
+
   const handleResolveAlert = async () => {
     if (!selectedAlert || !resolutionNotes.trim()) return;
     try {
       setResolvingAlert(true);
-      await api.post(`/admin/security/alerts/${selectedAlert.id}/resolve`, { resolution_notes: resolutionNotes });
+      const alertId = selectedAlert.id || selectedAlert._id;
+      await api.post(`/admin/security/alerts/${alertId}/resolve`, { resolution_notes: resolutionNotes });
       toast.success('Alert resolved successfully');
-      setAlertsData(alertsData.filter((a: any) => a.id !== selectedAlert.id));
+      setAlertsData(alertsData.filter((a: any) => (a.id || a._id) !== alertId));
+      if (activeTab === 'rbac') {
+        const rbacRes = await api.get('/admin/security/rbac');
+        setRbacData(rbacRes.data);
+      }
       setSelectedAlert(null);
       setResolutionNotes('');
     } catch (err) {
@@ -722,6 +758,87 @@ export function SecurityCompliancePage() {
         {/* TAB 5: RBAC & Access */}
         <TabsContent value="rbac" className="space-y-6 mt-4">
            <div className="grid grid-cols-1 gap-6">
+            {/* Locked User Accounts Section */}
+            <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-red-50 text-red-600 border border-red-100">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Locked Accounts & Access Restrictions</h3>
+                    <p className="text-xs text-slate-500">Accounts restricted by brute-force lockout policy. Administrator resolution required.</p>
+                  </div>
+                </div>
+                <span className={cn(
+                  "px-2.5 py-1 text-xs font-semibold rounded-full border",
+                  (rbacData?.locked_accounts?.length || 0) > 0 
+                    ? "bg-red-50 text-red-700 border-red-200" 
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                )}>
+                  {rbacData?.locked_accounts?.length || 0} Restricted
+                </span>
+              </div>
+
+              {rbacData?.locked_accounts && rbacData.locked_accounts.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="text-slate-500 bg-slate-50/50 uppercase">
+                      <tr>
+                        <th className="px-3 py-2 rounded-l-lg font-medium">User Email</th>
+                        <th className="px-3 py-2 font-medium">Role</th>
+                        <th className="px-3 py-2 font-medium">Reason</th>
+                        <th className="px-3 py-2 font-medium">Locked At</th>
+                        <th className="px-3 py-2 rounded-r-lg font-medium text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {rbacData.locked_accounts.map((acc: any, i: number) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-3 py-3 font-semibold text-slate-900 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                            <span>{acc.email}</span>
+                          </td>
+                          <td className="px-3 py-3 text-slate-600">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] uppercase">
+                              {acc.role}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-red-600 font-medium max-w-[200px] truncate" title={acc.locked_reason}>
+                            {acc.locked_reason || '5 consecutive failed attempts'}
+                          </td>
+                          <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
+                            {acc.locked_at ? format(new Date(acc.locked_at), 'MMM dd, HH:mm') : 'Recently'}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleUnlockAccount(acc.email)}
+                              disabled={unlockingEmail === acc.email}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-3 rounded-lg"
+                            >
+                              {unlockingEmail === acc.email ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" />
+                              ) : (
+                                <Key className="w-3.5 h-3.5 mr-1" />
+                              )}
+                              Unlock Account
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-6 px-4 bg-slate-50/60 rounded-xl border border-dashed border-slate-200 text-center flex flex-col items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-emerald-500 mb-1" />
+                  <p className="text-sm font-medium text-slate-800">All Accounts Active & Clear</p>
+                  <p className="text-xs text-slate-500 mt-0.5">No accounts are currently locked or restricted by the brute-force defense system.</p>
+                </div>
+              )}
+            </div>
+
             <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Role Permission Matrix</h3>
               <div className="overflow-x-auto">
@@ -882,6 +999,31 @@ export function SecurityCompliancePage() {
                     {alert.status}
                   </span>
                 </div>
+                {(() => {
+                  const targetEmail = alert.target_user_email || alert.email || alert.description?.match(/account '([^']+)'/)?.[1];
+                  if (!targetEmail) return null;
+                  return (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-mono truncate max-w-[140px]">{targetEmail}</span>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnlockAccount(targetEmail);
+                        }}
+                        disabled={unlockingEmail === targetEmail}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] h-6 px-2.5 rounded shadow-none"
+                      >
+                        {unlockingEmail === targetEmail ? (
+                          <RefreshCw className="w-3 h-3 animate-spin mr-1" />
+                        ) : (
+                          <Key className="w-3 h-3 mr-1" />
+                        )}
+                        Unlock User
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
             
@@ -1052,6 +1194,14 @@ export function SecurityCompliancePage() {
               <h4 className="font-medium text-slate-900 text-sm mb-1">{selectedAlert?.title}</h4>
               <p className="text-xs text-slate-600">{selectedAlert?.description}</p>
             </div>
+            {selectedAlert?.title?.toLowerCase().includes('lock') && (
+              <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Admin Action:</strong> Resolving this alert will automatically clear the lockout status for this account in the database and restore user login access.
+                </span>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-900">Resolution Notes</label>
               <Textarea 

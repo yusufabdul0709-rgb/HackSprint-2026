@@ -5,9 +5,12 @@ from datetime import datetime
 class UserBase(BaseModel):
     email: EmailStr
     name: str
-    role: str
+    role: str = "PARTICIPANT"
     organization_id: Optional[str] = None
     is_active: bool = True
+    is_locked: Optional[bool] = False
+    locked_at: Optional[datetime] = None
+    locked_reason: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -26,7 +29,10 @@ class UserResponse(UserBase):
     role: str
     organization_id: Optional[str] = None
     is_active: bool
-    created_at: datetime
+    is_locked: Optional[bool] = False
+    locked_at: Optional[datetime] = None
+    locked_reason: Optional[str] = None
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     model_config = ConfigDict(populate_by_name=True)
 
 class UserLogin(BaseModel):

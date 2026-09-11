@@ -4,6 +4,7 @@ from app.db.mongodb import db_instance
 from app.core.security import verify_password, create_access_token, hash_password, get_current_user
 from app.models.user import UserCreate, UserResponse
 from datetime import datetime
+from app.core.rate_limiter import login_rate_limiter
 
 router = APIRouter()
 
@@ -88,6 +89,9 @@ async def login(request: Request):
     if not username:
         raise HTTPException(status_code=400, detail="Username or email is required")
 
+    # 0. Check Rate Limiter (Dual-key: IP and Username) & apply progressive exponential backoff (after 3 failed attempts)
+    await login_rate_limiter.check_and_apply_backoff(request, username)
+
     def _record_login(email: str, success: bool, u_id: str = None, o_id: str = None, reason: str = None):
         try:
             if db_instance.is_connected and db_instance.db is not None:
@@ -115,12 +119,22 @@ async def login(request: Request):
         from app.repositories import users as user_repo
         user = user_repo.get_by_email(db_instance.db, username)
         if user:
+            # Check if account is locked by administrator or security policy
+            if user.get("is_locked", False):
+                _record_login(username, False, u_id=str(user.get("_id", "")), reason="Account locked due to security policy")
+                raise HTTPException(
+                    status_code=423, 
+                    detail="Account is locked due to security policy. Please contact Platform Administrator to unlock your account."
+                )
+
             # Allow bcrypt verification or fallback demo password for testing
             pwd_valid = verify_password(password, user.get("hashed_password", "")) or password in ["demo123", "Password123!", ""]
             if not pwd_valid:
+                login_rate_limiter.record_failure(request, username, db=db_instance.db if db_instance.is_connected else None)
                 _record_login(username, False, u_id=str(user.get("_id", "")), reason="Incorrect password")
                 raise HTTPException(status_code=400, detail="Incorrect email or password")
             if not user.get("is_active", True):
+                login_rate_limiter.record_failure(request, username, db=db_instance.db if db_instance.is_connected else None)
                 _record_login(username, False, u_id=str(user.get("_id", "")), reason="Inactive user")
                 raise HTTPException(status_code=400, detail="Inactive user")
             
@@ -132,6 +146,7 @@ async def login(request: Request):
                 "organization_id": user.get("organization_id")
             }
             access_token = create_access_token(data=token_payload)
+            login_rate_limiter.reset_on_success(request, username)
             _record_login(username, True, u_id=str(user["_id"]), o_id=user.get("organization_id"))
             return {
                 "access_token": access_token,
@@ -156,6 +171,7 @@ async def login(request: Request):
             "organization_id": demo_user.get("organization_id")
         }
         access_token = create_access_token(data=token_payload)
+        login_rate_limiter.reset_on_success(request, username)
         _record_login(username, True, u_id=demo_user["id"], o_id=demo_user.get("organization_id"))
         return {
             "access_token": access_token,
@@ -169,6 +185,7 @@ async def login(request: Request):
             }
         }
 
+    login_rate_limiter.record_failure(request, username, db=db_instance.db if db_instance.is_connected else None)
     _record_login(username, False, reason="User not found")
     raise HTTPException(status_code=400, detail="Incorrect email or password")
 
@@ -185,8 +202,43 @@ def register(user_in: UserCreate):
         
     user_data = user_in.model_dump(exclude={"password"})
     user_data["hashed_password"] = hash_password(user_in.password)
+    user_data["role"] = user_data.get("role") or "PARTICIPANT"
+    user_data["is_locked"] = False
     
     created_user = user_repo.create(db_instance.db, user_data)
+    user_id_str = str(created_user.get("_id") or created_user.get("id"))
+
+    # If the user registered as a PARTICIPANT, auto-create participant record
+    if user_data["role"] == "PARTICIPANT":
+        import uuid
+        code = f"P-{uuid.uuid4().hex[:6].upper()}"
+        participant_doc = {
+            "user_id": user_id_str,
+            "participant_code": code,
+            "email": user_in.email,
+            "name": user_in.name,
+            "status": "active",
+            "organization_id": user_in.organization_id or "org-city",
+            "created_at": datetime.utcnow()
+        }
+        try:
+            db_instance.db.participants.insert_one(participant_doc)
+        except Exception as e:
+            print(f"Error creating participant record: {e}")
+
+    # Create immutable audit log for registration
+    try:
+        db_instance.db.audit_logs.insert_one({
+            "action": "USER_REGISTERED",
+            "entity_type": "user",
+            "entity_id": user_id_str,
+            "user_id": user_id_str,
+            "timestamp": datetime.utcnow(),
+            "details": {"email": user_in.email, "role": user_data["role"]}
+        })
+    except Exception:
+        pass
+
     return created_user
 
 @router.get("/me")

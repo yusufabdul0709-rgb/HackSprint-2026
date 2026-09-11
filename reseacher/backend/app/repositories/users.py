@@ -2,6 +2,9 @@ from bson import ObjectId
 from typing import List, Optional
 
 def create(db, user_data: dict) -> dict:
+    if "created_at" not in user_data or not user_data["created_at"]:
+        from datetime import datetime
+        user_data["created_at"] = datetime.utcnow()
     result = db.users.insert_one(user_data)
     user_data["_id"] = str(result.inserted_id)
     return user_data

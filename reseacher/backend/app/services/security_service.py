@@ -450,10 +450,24 @@ def get_rbac_health(db) -> dict:
                 
     privileged = [d for d in dormant if d["role"] in ["PLATFORM_ADMIN", "PRINCIPAL_INVESTIGATOR"]]
     
+    # Locked Accounts query
+    locked_users = list(db.users.find({"is_locked": True}))
+    locked_accounts = []
+    for lu in locked_users:
+        locked_accounts.append({
+            "user_id": str(lu["_id"]),
+            "email": lu.get("email"),
+            "name": lu.get("name"),
+            "role": lu.get("role"),
+            "locked_at": lu.get("locked_at"),
+            "locked_reason": lu.get("locked_reason", "Excessive failed login attempts")
+        })
+
     return {
         "role_matrix": role_matrix,
         "dormant_accounts": dormant,
-        "privileged_dormant": privileged
+        "privileged_dormant": privileged,
+        "locked_accounts": locked_accounts
     }
 
 def get_authentication_summary(db) -> dict:

@@ -80,6 +80,11 @@ def get_security_alerts(
         "total_by_severity": total_by_severity
     }
 
+class UnlockAccountRequest(BaseModel):
+    email: Optional[str] = None
+    user_id: Optional[str] = None
+    reason: Optional[str] = "Unlocked by Platform Administrator"
+
 @router.post("/alerts/{alert_id}/resolve", dependencies=[admin_dependency])
 def resolve_security_alert(
     alert_id: str, 
@@ -87,9 +92,38 @@ def resolve_security_alert(
     current_user: dict = admin_dependency,
     db = Depends(get_db)
 ):
+    from bson import ObjectId
+    import re
+    # Fetch alert before resolving to check if it's an account lockout
+    alert = None
+    try:
+        alert = db.security_alerts.find_one({"_id": ObjectId(alert_id)})
+    except Exception:
+        alert = db.security_alerts.find_one({"_id": alert_id})
+
     # Call repository to resolve the alert
     result = sec_repo.resolve_alert(db, alert_id, request.resolution_notes, current_user["id"])
     
+    # If this was an account lockout alert, automatically unlock the target user
+    if alert:
+        email = alert.get("email") or alert.get("target_user_email")
+        if not email and alert.get("description"):
+            match = re.search(r"account '([^']+)'", alert["description"])
+            if match:
+                email = match.group(1)
+        
+        if email:
+            email_clean = email.strip().lower()
+            db.users.update_one(
+                {"email": email_clean},
+                {
+                    "$set": {"is_locked": False, "unlocked_at": datetime.utcnow()},
+                    "$unset": {"locked_at": "", "locked_reason": ""}
+                }
+            )
+            from app.core.rate_limiter import login_rate_limiter
+            login_rate_limiter.unlock_account(email_clean)
+
     # Create immutable audit log for ALERT_RESOLVED
     audit_log = {
         "action": "ALERT_RESOLVED",
@@ -102,6 +136,82 @@ def resolve_security_alert(
     db.audit_logs.insert_one(audit_log)
     
     return {"status": "success", "resolved_alert_id": alert_id}
+
+@router.post("/unlock-account", dependencies=[admin_dependency])
+def unlock_account(
+    req: UnlockAccountRequest,
+    current_user: dict = admin_dependency,
+    db = Depends(get_db)
+):
+    from bson import ObjectId
+    user = None
+    if req.email:
+        user = db.users.find_one({"email": req.email.strip().lower()})
+    elif req.user_id:
+        try:
+            user = db.users.find_one({"_id": ObjectId(req.user_id)})
+        except Exception:
+            user = db.users.find_one({"_id": req.user_id})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found")
+
+    user_email = user.get("email", "").strip().lower()
+    
+    # 1. Clear lock in db.users
+    db.users.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {"is_locked": False, "unlocked_at": datetime.utcnow()},
+            "$unset": {"locked_at": "", "locked_reason": ""}
+        }
+    )
+
+    # 2. Reset in-memory rate limiter
+    from app.core.rate_limiter import login_rate_limiter
+    login_rate_limiter.unlock_account(user_email)
+
+    # 3. Resolve any open brute-force/lockout alerts for this user
+    db.security_alerts.update_many(
+        {
+            "$or": [
+                {"email": user_email},
+                {"target_user_email": user_email},
+                {"description": {"$regex": user_email, "$options": "i"}}
+            ],
+            "status": "OPEN"
+        },
+        {
+            "$set": {
+                "status": "RESOLVED",
+                "resolved_at": datetime.utcnow(),
+                "resolution_notes": f"Account unlocked by Platform Admin: {req.reason}",
+                "resolved_by": current_user["id"]
+            }
+        }
+    )
+
+    # 4. Immutable audit log
+    audit_log = {
+        "action": "USER_ACCOUNT_UNLOCKED",
+        "entity_type": "user",
+        "entity_id": str(user["_id"]),
+        "user_id": current_user["id"],
+        "timestamp": datetime.utcnow(),
+        "details": {
+            "unlocked_email": user_email,
+            "reason": req.reason,
+            "admin_id": current_user["id"]
+        }
+    }
+    db.audit_logs.insert_one(audit_log)
+
+    return {
+        "status": "success",
+        "message": f"Account '{user_email}' has been successfully unlocked.",
+        "email": user_email,
+        "user_id": str(user["_id"])
+    }
 
 @router.get("/audit", dependencies=[admin_dependency])
 def get_audit_explorer(

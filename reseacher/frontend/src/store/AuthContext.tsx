@@ -60,8 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setToken(access_token);
       setUser(authUser);
-    } catch (error) {
-      console.warn('Backend login fallback to demo credentials...', error);
+    } catch (error: any) {
+      // If backend actively responded with an error (400, 423 Locked, 429 Rate Limit, etc.), rethrow it!
+      if (error?.response?.status) {
+        throw error;
+      }
+      console.warn('Backend unreachable, falling back to demo credentials...', error);
       const demoRoles: Record<string, { role: Role; name: string }> = {
         'sarah.chen@trialbridge.io': { role: 'PLATFORM_ADMIN', name: 'Sarah Chen' },
         'j.patel@cityhospital.org': { role: 'PRINCIPAL_INVESTIGATOR', name: 'Dr. J Patel' },

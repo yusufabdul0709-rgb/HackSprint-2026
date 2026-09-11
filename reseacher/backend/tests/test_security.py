@@ -176,6 +176,22 @@ def test_brute_force_detection():
     assert alert is not None
     assert alert['severity'] in ['MEDIUM', 'HIGH']
 
+def test_brute_force_lockout_and_progressive_backoff():
+    from app.core.rate_limiter import login_rate_limiter
+    login_rate_limiter._email_tracker.clear()
+    login_rate_limiter._ip_tracker.clear()
+
+    target = "locked.user@trialbridge.io"
+    # 5 failed attempts
+    for _ in range(5):
+        res = client.post("/api/auth/login", json={"email": target, "password": "wrong"})
+        assert res.status_code == 400
+
+    # 6th attempt must be blocked with HTTP 429
+    res_blocked = client.post("/api/auth/login", json={"email": target, "password": "any"})
+    assert res_blocked.status_code == 429
+    assert "Retry-After" in res_blocked.headers
+    assert int(res_blocked.headers["Retry-After"]) > 800
 
 if __name__ == '__main__':
     print('Running test_security_models_validation...')
@@ -202,4 +218,8 @@ if __name__ == '__main__':
     test_brute_force_detection()
     print('PASS: test_brute_force_detection')
 
-    print('ALL 6 TEST SUITES PASSED SUCCESSFULLY!')
+    print('Running test_brute_force_lockout_and_progressive_backoff...')
+    test_brute_force_lockout_and_progressive_backoff()
+    print('PASS: test_brute_force_lockout_and_progressive_backoff')
+
+    print('ALL 7 TEST SUITES PASSED SUCCESSFULLY!')
