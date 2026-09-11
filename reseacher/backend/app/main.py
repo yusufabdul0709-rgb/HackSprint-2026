@@ -89,6 +89,15 @@ app.include_router(admet.router, prefix="/api/admet", tags=["admet"])
 app.include_router(ws.router, prefix="/api/ws", tags=["websocket"])
 app.include_router(admin_security.router, prefix="/api/admin/security", tags=["admin-security"])
 
+@app.get("/")
+def root_status():
+    return {
+        "service": "TrialBridge API",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
 @app.get("/api/health")
 def health_check():
     if not db_instance.is_connected:
