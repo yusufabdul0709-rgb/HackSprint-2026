@@ -42,6 +42,8 @@ interface TrialBridgeContextType {
   scheduleVisit: (visit: Visit) => void;
   updateTaskStatus: (taskId: string, status: Task['status']) => void;
   markMessageRead: (messageId: string) => void;
+  refreshData: () => Promise<void>;
+  refreshStudies: () => Promise<void>;
 }
 
 const TrialBridgeContext = createContext<TrialBridgeContextType | null>(null);
@@ -56,6 +58,18 @@ export function TrialBridgeProvider({ children }: { children: ReactNode }) {
   const [consentRecords, setConsentRecords] = useState<ConsentRecord[]>(mockConsentRecords);
   const [documents, setDocuments] = useState<Document[]>(mockDocuments);
   const [messages, setMessages] = useState<Message[]>(mockMessages);
+
+  // Fast single-resource study refresh
+  const refreshStudies = useCallback(async () => {
+    try {
+      const res = await api.get('/studies/');
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setStudies(res.data);
+      }
+    } catch (err) {
+      console.warn('Fast study refresh warning:', err);
+    }
+  }, []);
 
   const fetchInitialData = async () => {
     if (!isAuthenticated) return;
@@ -92,17 +106,58 @@ export function TrialBridgeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchInitialData();
-  }, [isAuthenticated]);
+
+    // Zero-latency instant hydration via WebSocket broadcast
+    const handleStudyCreated = (e: any) => {
+      const newStudy = e.detail?.study;
+      if (newStudy && (newStudy.id || newStudy.study_code)) {
+        setStudies((prev) => {
+          const exists = prev.some(
+            (s) => s.id === newStudy.id || (s as any).study_code === newStudy.study_code
+          );
+          if (exists) {
+            return prev.map((s) =>
+              s.id === newStudy.id || (s as any).study_code === newStudy.study_code
+                ? { ...s, ...newStudy }
+                : s
+            );
+          }
+          return [newStudy, ...prev];
+        });
+      } else {
+        refreshStudies();
+      }
+    };
+
+    const handleReviewsUpdated = () => refreshStudies();
+
+    window.addEventListener('trialbridge:study_created', handleStudyCreated);
+    window.addEventListener('trialbridge:reviews_updated', handleReviewsUpdated);
+    return () => {
+      window.removeEventListener('trialbridge:study_created', handleStudyCreated);
+      window.removeEventListener('trialbridge:reviews_updated', handleReviewsUpdated);
+    };
+  }, [isAuthenticated, refreshStudies]);
 
   const addStudy = useCallback(async (study: Study) => {
+    // 1. Instant optimistic local insertion (0ms UI latency)
+    setStudies((prev) => [study, ...prev.filter((s) => s.id !== study.id)]);
+
+    // 2. Persist to MongoDB Atlas in background
     try {
-      const res = await api.post('/studies', study);
-      setStudies((prev) => [...prev, res.data]);
+      const res = await api.post('/studies/', study);
+      const created = res.data;
+      if (created && (created.id || created.study_code)) {
+        setStudies((prev) => [
+          created,
+          ...prev.filter((s) => s.id !== study.id && s.id !== created.id)
+        ]);
+      }
     } catch (e) {
-      console.error(e);
-      setStudies((prev) => [...prev, study]);
+      console.warn('Persisting study to backend warning, retained locally:', e);
     }
   }, []);
+
 
   const approveScreening = useCallback(async (participantId: string, reviewerName: string, notes: string) => {
     try {
@@ -190,6 +245,8 @@ export function TrialBridgeProvider({ children }: { children: ReactNode }) {
         scheduleVisit,
         updateTaskStatus,
         markMessageRead,
+        refreshData: fetchInitialData,
+        refreshStudies,
       }}
     >
       {children}

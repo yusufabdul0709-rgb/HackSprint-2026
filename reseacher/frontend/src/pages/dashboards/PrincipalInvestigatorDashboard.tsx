@@ -307,12 +307,24 @@ export function PrincipalInvestigatorDashboard({ onNavigate }: PrincipalInvestig
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">Research Decisions Requiring Your Review</h2>
-              <p className="text-xs text-slate-500">Principal Investigator clinical eligibility evaluations awaiting your sign-off.</p>
+              <p className="text-xs text-slate-500">Clinical eligibility evaluations combining AI assistive screening, Coordinator verification, and PI sign-off.</p>
             </div>
           </div>
-          <span className="self-start sm:self-auto rounded-full bg-blue-100/80 px-3 py-1 text-xs font-bold text-blue-800 border border-blue-200">
-            {decisions.filter(d => d.status === 'PENDING').length} Action Items Pending
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="self-start sm:self-auto rounded-full bg-blue-100/80 px-3 py-1 text-xs font-bold text-blue-800 border border-blue-200">
+              {decisions.filter(d => d.status === 'PENDING').length} Action Items Pending
+            </span>
+            {onNavigate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate('eligibility-reviews')}
+                className="h-7 text-xs font-semibold text-blue-700 hover:bg-blue-50 border-blue-200"
+              >
+                View Full Reviews Queue →
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">

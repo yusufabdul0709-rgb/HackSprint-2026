@@ -48,7 +48,8 @@ export function useRealTimeNotifications() {
     }
 
     const currentToken = token || localStorage.getItem('trialbridge_token') || `demo-jwt-token-${(role || 'participant').toLowerCase()}`;
-    const host = window.location.hostname || '127.0.0.1';
+    const rawHost = window.location.hostname || '127.0.0.1';
+    const host = rawHost === 'localhost' ? '127.0.0.1' : rawHost;
     // Backend runs on port 8000
     const wsUrl = `ws://${host}:8000/api/ws/notifications?token=${encodeURIComponent(currentToken)}&user_id=${encodeURIComponent(user?.id || '')}&role=${encodeURIComponent(role || '')}`;
 
@@ -99,6 +100,29 @@ export function useRealTimeNotifications() {
                 duration: 5000,
               });
               fetchNotifications();
+            } else if (data.event === 'STUDY_CREATED') {
+              toast.info(`New Study Published: ${data.study_title || 'Clinical Trial'}`, {
+                description: `Created by ${data.principal_investigator || 'PI'}. Candidate intake now open.`,
+                duration: 8000,
+              });
+              window.dispatchEvent(new CustomEvent('trialbridge:study_created', { detail: data }));
+              fetchNotifications();
+            } else if (data.event === 'ELIGIBILITY_REVIEW_REQUESTED') {
+              if (role === 'PRINCIPAL_INVESTIGATOR' || role === 'PLATFORM_ADMIN') {
+                toast.info(`Eligibility Reviews Awaiting Sign-off`, {
+                  description: `${data.coordinator_name || 'Coordinator'} submitted ${data.count || ''} candidates in ${data.study_title || 'Study'}.`,
+                  duration: 8000,
+                });
+              }
+              window.dispatchEvent(new CustomEvent('trialbridge:reviews_updated', { detail: data }));
+              fetchNotifications();
+            } else if (data.event === 'ELIGIBILITY_REVIEW_FINALIZED') {
+              toast.success(`Authoritative Sign-off Recorded`, {
+                description: `Participant ${data.participant_code}: ${data.decision} by PI.`,
+                duration: 7000,
+              });
+              window.dispatchEvent(new CustomEvent('trialbridge:reviews_updated', { detail: data }));
+              fetchNotifications();
             } else if (data.event === 'ADMET_REVIEW_REQUESTED') {
               if (role === 'PRINCIPAL_INVESTIGATOR') {
                 toast.info(`ADMET Review Requested`, {
@@ -114,6 +138,7 @@ export function useRealTimeNotifications() {
               });
               fetchNotifications();
             }
+
           } catch {
             // ping response or non-json message
           }
@@ -129,7 +154,7 @@ export function useRealTimeNotifications() {
           if (!isUnmounted) {
             // Exponential backoff reconnect
             reconnectTimeoutRef.current = setTimeout(() => {
-              connectWebSocket();
+              if (!isUnmounted) connectWebSocket();
             }, 3000);
           }
         };
@@ -145,8 +170,19 @@ export function useRealTimeNotifications() {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (socketRef.current) {
-        socketRef.current.close();
+        const ws = socketRef.current;
         socketRef.current = null;
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try { ws.close(); } catch (_) {}
+          };
+        } else if (ws.readyState === WebSocket.OPEN) {
+          try { ws.close(); } catch (_) {}
+        }
       }
     };
   }, [isAuthenticated, token, role, user?.id, fetchNotifications, updateCount]);

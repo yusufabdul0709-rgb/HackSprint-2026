@@ -14,6 +14,7 @@ import {
   X,
   Trash2,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,14 +25,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Study, EligibilityCriterion, StudyStatus } from '@/types';
 import { cn } from '@/lib/utils';
+import { CandidateUploadModal } from '@/components/study/CandidateUploadModal';
+import { toast } from 'sonner';
 
 export function StudiesPage() {
-  const { studies, addStudy } = useTrialBridge();
+  const { studies, addStudy, refreshStudies, refreshData } = useTrialBridge();
   const { role, user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [uploadStudy, setUploadStudy] = useState<Study | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isPI = role === 'PRINCIPAL_INVESTIGATOR';
 
@@ -51,16 +56,32 @@ export function StudiesPage() {
             {isPI ? 'Create, configure, and oversee clinical trial protocols.' : 'Browse, read, and conduct active clinical trial research.'}
           </p>
         </div>
-        {isPI ? (
-          <Button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4" /> Create Study (PI Only)
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setIsRefreshing(true);
+              await refreshStudies();
+              setIsRefreshing(false);
+              toast.success('Clinical studies synchronized with backend');
+            }}
+            className="flex items-center gap-1.5 text-xs text-slate-700 hover:bg-slate-50 border-slate-200"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 text-slate-500", isRefreshing && "animate-spin text-blue-600")} />
+            Sync Studies
           </Button>
-        ) : (
-          <div className="flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 px-3.5 py-1.5 text-xs text-slate-600">
-            <FlaskConical className="h-3.5 w-3.5 text-slate-500" />
-            <span>Study Creation: Exclusive to Principal Investigators</span>
-          </div>
-        )}
+          {isPI ? (
+            <Button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4" /> Create Study (PI Only)
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 px-3.5 py-1.5 text-xs text-slate-600">
+              <FlaskConical className="h-3.5 w-3.5 text-slate-500" />
+              <span>Study Creation: Exclusive to Principal Investigators</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -121,12 +142,23 @@ export function StudiesPage() {
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {(study.researchSite || 'City Hospital').split(',')[0]}</span>
                 <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {study.startDate || '2026-06-01'}</span>
               </div>
-              <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3">
-                <ProgressRing value={pct} size={40} stroke={3} color={pct >= 75 ? '#22C55E' : pct >= 50 ? '#3B82F6' : '#F59E0B'} />
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Enrollment</p>
-                  <p className="text-sm font-medium text-slate-800">{enrolled} / {target}</p>
+              <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
+                <ProgressRing value={pct} size={36} stroke={3} color={pct >= 75 ? '#22C55E' : pct >= 50 ? '#3B82F6' : '#F59E0B'} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-slate-500">Enrollment</p>
+                  <p className="text-xs font-semibold text-slate-800">{enrolled} / {target}</p>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUploadStudy(study);
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 border-blue-200 bg-blue-50/50 hover:bg-blue-100/70"
+                >
+                  <Users className="h-3.5 w-3.5" /> Candidate Intake & AI Match
+                </Button>
                 <ChevronRight className="h-4 w-4 text-slate-300" />
               </div>
             </motion.div>
@@ -135,7 +167,24 @@ export function StudiesPage() {
       </div>
 
       {/* Study Detail Dialog */}
-      <StudyDetailDialog study={selectedStudy} role={role} onClose={() => setSelectedStudy(null)} />
+      <StudyDetailDialog
+        study={selectedStudy}
+        role={role}
+        onClose={() => setSelectedStudy(null)}
+        onOpenUpload={(s) => setUploadStudy(s)}
+      />
+
+      {/* Candidate Upload & Matching Modal */}
+      {uploadStudy && (
+        <CandidateUploadModal
+          open={!!uploadStudy}
+          study={uploadStudy}
+          onClose={() => setUploadStudy(null)}
+          onSuccess={() => {
+            refreshData();
+          }}
+        />
+      )}
 
       {/* Create Study Dialog (PI Only) */}
       {isPI && (
@@ -150,7 +199,18 @@ export function StudiesPage() {
   );
 }
 
-function StudyDetailDialog({ study, role, onClose }: { study: Study | null; role: string; onClose: () => void }) {
+
+function StudyDetailDialog({
+  study,
+  role,
+  onClose,
+  onOpenUpload
+}: {
+  study: Study | null;
+  role: string;
+  onClose: () => void;
+  onOpenUpload?: (study: Study) => void;
+}) {
   if (!study) return null;
   const target = study.targetParticipants || 100;
   const enrolled = study.enrolledParticipants || 0;
@@ -159,6 +219,7 @@ function StudyDetailDialog({ study, role, onClose }: { study: Study | null; role
   const studyName = study.name || (study as any).title || 'Clinical Study';
   const condition = study.condition || study.description || 'Clinical Research';
   const criteria = study.eligibilityCriteria || [];
+
 
   return (
     <Dialog open={!!study} onOpenChange={(o) => !o && onClose()}>
@@ -247,6 +308,27 @@ function StudyDetailDialog({ study, role, onClose }: { study: Study | null; role
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Candidate Participant Intake & AI Screening Action */}
+          {onOpenUpload && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Study Participant Intake & AI Matching</p>
+                <p className="text-xs text-slate-500">
+                  Ingest EHR datasets, run deterministic rule engine matching against protocol criteria, and submit to PI.
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  onClose();
+                  onOpenUpload(study);
+                }}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-xs shrink-0"
+              >
+                <Users className="h-4 w-4" /> Upload Candidates
+              </Button>
             </div>
           )}
 

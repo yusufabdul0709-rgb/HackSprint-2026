@@ -274,6 +274,22 @@ function NormalizedModel({
     return clone;
   }, [scene, system, config.targetScale, isSimulated, isAmlodipine, targetOrgans, affectedZones]);
 
+  // Cleanly dispose Three.js materials to prevent GPU memory leaks and WebGL context loss
+  React.useEffect(() => {
+    return () => {
+      clonedScene.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => m.dispose());
+          } else if (mesh.material) {
+            mesh.material.dispose();
+          }
+        }
+      });
+    };
+  }, [clonedScene]);
+
   // Smooth continuous rotation around Y axis
   useFrame((_, delta) => {
     if (autoRotate && groupRef.current) {
@@ -499,6 +515,19 @@ export function AnatomySpace3D({
       {/* 3D WebGL Canvas */}
       <Canvas
         camera={{ position: [0, 0, 4.2], fov: 45 }}
+        gl={{
+          antialias: true,
+          powerPreference: 'default',
+          preserveDrawingBuffer: true,
+        }}
+        onCreated={({ gl }) => {
+          const canvasEl = gl.domElement;
+          const handleContextLost = (e: Event) => {
+            e.preventDefault();
+            console.debug('WebGL context lost, preventing browser crash.');
+          };
+          canvasEl.addEventListener('webglcontextlost', handleContextLost);
+        }}
         className="h-full w-full cursor-grab active:cursor-grabbing"
       >
         <ambientLight intensity={1.2} />

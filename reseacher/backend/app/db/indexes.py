@@ -63,6 +63,21 @@ def create_indexes(db):
         IndexModel([("status", ASCENDING)])
     ])
     
+    # Candidates
+    db.candidates.create_indexes([
+        IndexModel([("study_id", ASCENDING)]),
+        IndexModel([("batch_id", ASCENDING)]),
+        IndexModel([("screening_status", ASCENDING)]),
+        IndexModel([("participant_code", ASCENDING)]),
+        IndexModel([("created_at", DESCENDING)])
+    ])
+
+    # Upload Batches
+    db.upload_batches.create_indexes([
+        IndexModel([("study_id", ASCENDING)]),
+        IndexModel([("uploaded_at", DESCENDING)])
+    ])
+    
     # Notifications
     db.notifications.create_indexes([
         IndexModel([("recipient_id", ASCENDING)]),

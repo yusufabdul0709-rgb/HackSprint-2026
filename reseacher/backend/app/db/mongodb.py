@@ -43,9 +43,16 @@ def startup_connect():
             client = MongoClient(
                 uri,
                 tlsCAFile=certifi.where(),
-                serverSelectionTimeoutMS=8000,
-                connectTimeoutMS=8000,
-                socketTimeoutMS=8000
+                serverSelectionTimeoutMS=3000,
+                connectTimeoutMS=3000,
+                socketTimeoutMS=5000,
+                maxPoolSize=100,
+                minPoolSize=10,
+                maxIdleTimeMS=45000,
+                waitQueueTimeoutMS=5000,
+                retryWrites=True,
+                readPreference="primaryPreferred",
+                appname="TrailBridgeFastAPI"
             )
             client.admin.command('ping')
             db_instance.client = client
