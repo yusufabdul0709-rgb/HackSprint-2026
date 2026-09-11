@@ -111,3 +111,69 @@ def create_indexes(db):
         IndexModel([("study_id", ASCENDING)]),
         IndexModel([("created_by", ASCENDING)])
     ])
+
+    # --- Security & Compliance Collections ---
+
+    # Security Events
+    db.security_events.create_indexes([
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("event_type", ASCENDING)]),
+        IndexModel([("severity", ASCENDING)]),
+        IndexModel([("category", ASCENDING)]),
+        IndexModel([("user_id", ASCENDING)]),
+        IndexModel([("organization_id", ASCENDING)]),
+        IndexModel([("status_code", ASCENDING)])
+    ])
+
+    # Security Alerts
+    db.security_alerts.create_indexes([
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("status", ASCENDING)]),
+        IndexModel([("severity", ASCENDING)]),
+        IndexModel([("category", ASCENDING)])
+    ])
+
+    # Login Events
+    db.login_events.create_indexes([
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("email", ASCENDING)]),
+        IndexModel([("success", ASCENDING)]),
+        IndexModel([("ip_address", ASCENDING)]),
+        IndexModel([("user_id", ASCENDING)])
+    ])
+
+    # Access Events
+    db.access_events.create_indexes([
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("user_id", ASCENDING)]),
+        IndexModel([("role", ASCENDING)]),
+        IndexModel([("resource_type", ASCENDING)]),
+        IndexModel([("organization_id", ASCENDING)])
+    ])
+
+    # Consent Events
+    db.consent_events.create_indexes([
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("participant_id", ASCENDING)]),
+        IndexModel([("study_id", ASCENDING)]),
+        IndexModel([("action", ASCENDING)]),
+        IndexModel([("consent_id", ASCENDING)])
+    ])
+
+    # Immutable Audit Logs (hash-chained)
+    db.immutable_audit_logs.create_indexes([
+        IndexModel([("timestamp", ASCENDING)]),
+        IndexModel([("user_id", ASCENDING)]),
+        IndexModel([("action", ASCENDING)]),
+        IndexModel([("entity_type", ASCENDING)]),
+        IndexModel([("entity_id", ASCENDING)]),
+        IndexModel([("organization_id", ASCENDING)]),
+        IndexModel([("study_id", ASCENDING)]),
+        IndexModel([("event_hash", ASCENDING)])
+    ])
+
+    # Compliance Controls
+    db.compliance_controls.create_indexes([
+        IndexModel([("framework", ASCENDING)]),
+        IndexModel([("status", ASCENDING)])
+    ])

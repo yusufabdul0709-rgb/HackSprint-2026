@@ -27,11 +27,21 @@ import type { Participant } from '@/types';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
-export function ParticipantsPage() {
+interface ParticipantsPageProps {
+  title?: string;
+  description?: string;
+  initialStatusFilter?: string;
+}
+
+export function ParticipantsPage({
+  title = 'Participants',
+  description = 'Manage and track study participants',
+  initialStatusFilter = 'all',
+}: ParticipantsPageProps = {}) {
   const { participants, studies, visits, tasks, consentRecords, documents } = useTrialBridge();
   const [search, setSearch] = useState('');
   const [studyFilter, setStudyFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [selected, setSelected] = useState<Participant | null>(null);
 
   const filtered = participants.filter(
@@ -44,8 +54,8 @@ export function ParticipantsPage() {
   return (
     <div className="space-y-6">
       <div className="animate-fade-in">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Participants</h1>
-        <p className="mt-1 text-sm text-slate-500">Manage and track study participants</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
