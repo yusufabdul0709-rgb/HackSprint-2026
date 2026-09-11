@@ -3,14 +3,15 @@ from typing import Optional
 from datetime import datetime
 
 class AuditLogBase(BaseModel):
-    user_id: str
-    role: str
+    user_id: Optional[str] = "SYSTEM"
+    role: Optional[str] = "SYSTEM"
     action: str
-    entity_type: str
-    entity_id: str
+    entity_type: Optional[str] = "system"
+    entity_id: Optional[str] = "N/A"
     old_status: Optional[str] = None
     new_status: Optional[str] = None
     reason: Optional[str] = None
+    details: Optional[dict] = None
 
 class AuditLogCreate(AuditLogBase):
     pass
