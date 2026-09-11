@@ -25,6 +25,7 @@ import { OrganizationsPage } from '@/pages/OrganizationsPage';
 import { UsersManagementPage } from '@/pages/UsersManagementPage';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
+import { SecurityCompliancePage } from '@/pages/SecurityCompliancePage';
 import { Toaster } from '@/components/ui/sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,7 @@ function AppContent() {
     switch (currentNav) {
       case 'studies': return <StudiesPage />;
       case 'participants': return <ParticipantsPage />;
+      case 'candidates': return <ParticipantsPage title="Candidates & Recruitment" description="Identify, manage, and evaluate clinical trial candidates" />;
       case 'screening': return <ScreeningPage />;
       case 'consent': return <ConsentPage />;
       case 'visits': return <VisitsPage />;
@@ -81,13 +83,17 @@ function AppContent() {
       case 'platform-studies': return <StudiesPage />;
       case 'system-activity': return <AuditLogsPage />;
       case 'audit-logs': return <AuditLogsPage />;
-      case 'security': return <PlaceholderPage title="Security & Compliance" description="SOC2, HIPAA, and 21 CFR Part 11 security settings." />;
+      case 'security': 
+        return role === 'PLATFORM_ADMIN'
+          ? <SecurityCompliancePage />
+          : <PlaceholderPage title="Access Restricted" description="Security & Compliance Control Center is restricted strictly to Platform Administrators." />;
       case 'support': return <PlaceholderPage title="Support & Helpdesk" description="Platform ticketing and researcher support." />;
       case 'research-sites': return <OrganizationsPage />;
       case 'team': return <UsersManagementPage />;
       case 'analytics': return <ReportsPage />;
       case 'my-studies': return <StudiesPage />;
       case 'eligibility-reviews': return <EligibilityReviewsPage />;
+      case 'approvals': return <EligibilityReviewsPage />;
       case 'protocol': return <StudiesPage />;
       case 'study-visits': return <VisitsPage />;
       case 'simulation-lab': 

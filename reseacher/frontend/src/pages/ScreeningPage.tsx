@@ -13,8 +13,10 @@ import {
   Info,
   Clock,
   FileSignature,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -27,10 +29,29 @@ export function ScreeningPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'info' | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [queueSearch, setQueueSearch] = useState('');
+  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'reviewed'>('all');
 
   const reviewableParticipants = participants.filter(
     (p) => p.screeningStatus === 'potentially_eligible' || p.screeningStatus === 'human_review' || (p.screeningReviewed && p.screeningResults)
   );
+
+  const filteredQueue = reviewableParticipants.filter((p) => {
+    const q = queueSearch.trim().toLowerCase();
+    const matchesSearch = !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.id.toLowerCase().includes(q) ||
+      (p.studyName && p.studyName.toLowerCase().includes(q));
+    if (!matchesSearch) return false;
+
+    if (queueFilter === 'pending') {
+      return p.screeningStatus === 'potentially_eligible' || p.screeningStatus === 'human_review';
+    }
+    if (queueFilter === 'reviewed') {
+      return p.screeningReviewed || p.screeningStatus === 'approved' || p.screeningStatus === 'rejected';
+    }
+    return true;
+  });
 
   const selected = participants.find((p) => p.id === selectedId) || reviewableParticipants[0] || participants.find(p => p.screeningResults);
 
@@ -84,26 +105,81 @@ export function ScreeningPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Participant List */}
-        <div className="rounded-2xl border border-slate-200/60 bg-white p-4 animate-fade-in">
-          <h2 className="text-sm font-semibold text-slate-900">Screening Queue</h2>
-          <p className="text-xs text-slate-500 mb-3">{reviewableParticipants.length} participants</p>
-          <div className="space-y-1.5">
-            {reviewableParticipants.map((p) => (
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-4 animate-fade-in flex flex-col h-[650px] max-h-[calc(100vh-12rem)] lg:sticky lg:top-6 shadow-xs">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Screening Queue</h2>
+              <p className="text-xs text-slate-500">{reviewableParticipants.length} participants</p>
+            </div>
+            {filteredQueue.length !== reviewableParticipants.length && (
+              <span className="text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                {filteredQueue.length} shown
+              </span>
+            )}
+          </div>
+
+          {/* Quick Search */}
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="Search queue by name or ID..."
+              value={queueSearch}
+              onChange={(e) => setQueueSearch(e.target.value)}
+              className="h-8 pl-8 pr-7 text-xs bg-slate-50/70 border-slate-200 focus:bg-white transition-colors"
+            />
+            {queueSearch && (
+              <button
+                onClick={() => setQueueSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 p-0.5"
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1 mb-3">
+            {(['all', 'pending', 'reviewed'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setQueueFilter(filter)}
+                className={cn(
+                  'px-2.5 py-1 text-[11px] font-medium rounded-lg capitalize transition-colors',
+                  queueFilter === filter
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70'
+                )}
+              >
+                {filter === 'all' ? 'All' : filter}
+              </button>
+            ))}
+          </div>
+
+          {/* Scrollable list with smooth scrolling */}
+          <div className="flex-1 overflow-y-auto pr-1 space-y-1.5 scroll-smooth overscroll-contain">
+            {filteredQueue.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setSelectedId(p.id)}
                 className={cn(
-                  'w-full rounded-xl p-3 text-left transition-colors',
-                  selected?.id === p.id ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-slate-50'
+                  'w-full rounded-xl p-3 text-left transition-all duration-150 border',
+                  selected?.id === p.id 
+                    ? 'bg-blue-50/90 border-blue-300 ring-1 ring-blue-300 shadow-xs' 
+                    : 'border-transparent hover:bg-slate-50 hover:border-slate-200'
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
+                  <div className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold transition-colors",
+                    selected?.id === p.id ? "bg-blue-600 text-white shadow-xs" : "bg-slate-100 text-slate-600"
+                  )}>
                     {p.name.split(' ').map(n => n[0]).join('')}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-500">{p.id} · {p.studyName}</p>
+                    <p className="text-xs text-slate-500 truncate">{p.id} · {p.studyName}</p>
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
@@ -116,6 +192,20 @@ export function ScreeningPage() {
                 </div>
               </button>
             ))}
+
+            {filteredQueue.length === 0 && (
+              <div className="py-8 text-center">
+                <p className="text-xs text-slate-500">No participants matching criteria</p>
+                {(queueSearch || queueFilter !== 'all') && (
+                  <button
+                    onClick={() => { setQueueSearch(''); setQueueFilter('all'); }}
+                    className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -88,6 +88,28 @@ async def login(request: Request):
     if not username:
         raise HTTPException(status_code=400, detail="Username or email is required")
 
+    def _record_login(email: str, success: bool, u_id: str = None, o_id: str = None, reason: str = None):
+        try:
+            if db_instance.is_connected and db_instance.db is not None:
+                from app.repositories import security_repository as sec_repo
+                from app.services import security_service
+                ip = request.client.host if request.client else "unknown"
+                ua = request.headers.get("user-agent", "unknown")
+                sec_repo.insert_login_event(db_instance.db, {
+                    "user_id": u_id,
+                    "email": email,
+                    "ip_address": ip,
+                    "user_agent": ua,
+                    "success": success,
+                    "failure_reason": reason,
+                    "organization_id": o_id,
+                    "risk_score": 0 if success else 25
+                })
+                if not success:
+                    security_service.detect_brute_force(db_instance.db, email, ip)
+        except Exception:
+            pass
+
     # 1. Check live MongoDB database if connected
     if db_instance.is_connected and db_instance.db is not None:
         from app.repositories import users as user_repo
@@ -96,8 +118,10 @@ async def login(request: Request):
             # Allow bcrypt verification or fallback demo password for testing
             pwd_valid = verify_password(password, user.get("hashed_password", "")) or password in ["demo123", "Password123!", ""]
             if not pwd_valid:
+                _record_login(username, False, u_id=str(user.get("_id", "")), reason="Incorrect password")
                 raise HTTPException(status_code=400, detail="Incorrect email or password")
             if not user.get("is_active", True):
+                _record_login(username, False, u_id=str(user.get("_id", "")), reason="Inactive user")
                 raise HTTPException(status_code=400, detail="Inactive user")
             
             token_payload = {
@@ -108,6 +132,7 @@ async def login(request: Request):
                 "organization_id": user.get("organization_id")
             }
             access_token = create_access_token(data=token_payload)
+            _record_login(username, True, u_id=str(user["_id"]), o_id=user.get("organization_id"))
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
@@ -131,6 +156,7 @@ async def login(request: Request):
             "organization_id": demo_user.get("organization_id")
         }
         access_token = create_access_token(data=token_payload)
+        _record_login(username, True, u_id=demo_user["id"], o_id=demo_user.get("organization_id"))
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -143,6 +169,7 @@ async def login(request: Request):
             }
         }
 
+    _record_login(username, False, reason="User not found")
     raise HTTPException(status_code=400, detail="Incorrect email or password")
 
 @router.post("/register", response_model=UserResponse)

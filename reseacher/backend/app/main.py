@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.db.mongodb import startup_connect, shutdown_disconnect, get_db, db_instance
 from app.db.indexes import create_indexes
 from app.routes import auth, users, organizations, studies, participants, screening, eligibility, consent, enrollment, visits, tasks, documents, notifications, messages, reports, simulation, audit, admet, ws
+from app.routes import security as admin_security
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,6 +63,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Security event logging middleware (must be added after CORS middleware)
+from app.core.security_middleware import SecurityEventMiddleware
+app.add_middleware(SecurityEventMiddleware)
+
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])
@@ -82,6 +87,7 @@ app.include_router(simulation.router, prefix="/api/simulation", tags=["simulatio
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(admet.router, prefix="/api/admet", tags=["admet"])
 app.include_router(ws.router, prefix="/api/ws", tags=["websocket"])
+app.include_router(admin_security.router, prefix="/api/admin/security", tags=["admin-security"])
 
 @app.get("/api/health")
 def health_check():
