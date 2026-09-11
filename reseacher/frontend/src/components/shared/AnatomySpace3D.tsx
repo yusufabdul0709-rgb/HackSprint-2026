@@ -91,6 +91,14 @@ interface ModelSceneProps {
   autoRotate: boolean;
   isSimulated: boolean;
   compoundId: string;
+  targetOrgans?: string[];
+  affectedZones?: {
+    name: string;
+    system: AnatomicalSystem;
+    score: number;
+    color: 'red' | 'green' | 'blue';
+    role: string;
+  }[];
 }
 
 function NormalizedModel({
@@ -98,6 +106,8 @@ function NormalizedModel({
   autoRotate,
   isSimulated,
   compoundId,
+  targetOrgans,
+  affectedZones,
 }: ModelSceneProps) {
   const config = SYSTEM_CONFIGS[system];
   const { scene } = useGLTF(config.modelPath);
@@ -162,108 +172,98 @@ function NormalizedModel({
             });
           }
         } else {
-          // SIMULATED ACTIVE STATE: Highlight affected and target organs
-          if (!isAmlodipine) {
-            // Drug is C4H11N5 (Metformin) for Type 2 Diabetes
-            // Primary affected organ: Kidneys (RED)
-            // Target organs: Pancreas, GI Tract (GREEN)
+          // SIMULATED ACTIVE STATE: Dynamic Organ Highlighting
+          const meshNameLower = mesh.name.toLowerCase();
+
+          // 1. Check if mesh matches primary target organs
+          let isPrimary = false;
+          if (targetOrgans && targetOrgans.length > 0) {
+            isPrimary = targetOrgans.some((kw) => meshNameLower.includes(kw.toLowerCase()));
+          } else if (isAmlodipine) {
+            isPrimary =
+              system === 'vascular' ||
+              (system === 'visceral' && isKidneyMesh(mesh.name)) ||
+              (system === 'nervous' && (meshNameLower.includes('brain') || meshNameLower.includes('midbrain') || meshNameLower.includes('ventricle')));
+          } else {
+            // Default C4H11N5 Metformin
+            isPrimary = system === 'visceral' && isKidneyMesh(mesh.name);
+          }
+
+          // 2. Check if mesh matches secondary target zones
+          const matchedZone = affectedZones?.find((z) => {
+            if (z.system !== system) return false;
+            const keywords = z.name
+              .toLowerCase()
+              .replace(/[^a-z0-9\s]/g, '')
+              .split(/\s+/)
+              .filter((w) => w.length > 3 && !['affected', 'target', 'renal', 'damage', 'elimination'].includes(w));
+            return keywords.some((kw) => meshNameLower.includes(kw));
+          });
+
+          if (isPrimary) {
+            // AFFECTED ORGANS: Illuminated in glowing RED
+            mesh.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color('#ef4444'),
+              emissive: new THREE.Color('#dc2626'),
+              emissiveIntensity: 0.95,
+              roughness: 0.25,
+              metalness: 0.15,
+            });
+            mesh.renderOrder = 10;
+          } else if (matchedZone && matchedZone.color !== 'red') {
+            // Secondary target zones in emerald GREEN or cyan BLUE
+            const colorHex = matchedZone.color === 'blue' ? '#06b6d4' : '#10b981';
+            const emissiveHex = matchedZone.color === 'blue' ? '#0891b2' : '#059669';
+            mesh.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(colorHex),
+              emissive: new THREE.Color(emissiveHex),
+              emissiveIntensity: 0.7,
+              roughness: 0.3,
+              metalness: 0.1,
+            });
+          } else if (isTargetMesh(mesh.name) && (!targetOrgans || targetOrgans.length === 0)) {
+            // Fallback for Metformin pancreas / colon
+            mesh.material = new THREE.MeshStandardMaterial({
+              color: new THREE.Color('#10b981'),
+              emissive: new THREE.Color('#059669'),
+              emissiveIntensity: 0.65,
+              roughness: 0.3,
+              metalness: 0.1,
+            });
+          } else {
+            // Neutral / subtle background anatomy
             if (system === 'visceral') {
-              if (isKidneyMesh(mesh.name)) {
-                // AFFECTED ORGANS: Kidneys illuminated in glowing RED
-                mesh.material = new THREE.MeshStandardMaterial({
-                  color: new THREE.Color('#ef4444'),
-                  emissive: new THREE.Color('#dc2626'),
-                  emissiveIntensity: 0.95,
-                  roughness: 0.25,
-                  metalness: 0.15,
-                });
-                mesh.renderOrder = 10;
-              } else if (isTargetMesh(mesh.name)) {
-                // TARGET ORGANS: Pancreas & colon in emerald GREEN
-                mesh.material = new THREE.MeshStandardMaterial({
-                  color: new THREE.Color('#10b981'),
-                  emissive: new THREE.Color('#059669'),
-                  emissiveIntensity: 0.65,
-                  roughness: 0.3,
-                  metalness: 0.1,
-                });
-              } else {
-                // Neutral tissues
-                mesh.material = new THREE.MeshStandardMaterial({
-                  color: new THREE.Color('#786257'),
-                  roughness: 0.5,
-                  metalness: 0.05,
-                  transparent: true,
-                  opacity: 0.85,
-                });
-              }
+              mesh.material = new THREE.MeshStandardMaterial({
+                color: new THREE.Color('#786257'),
+                roughness: 0.5,
+                metalness: 0.05,
+                transparent: true,
+                opacity: 0.75,
+              });
             } else if (system === 'skeletal') {
               mesh.material = new THREE.MeshStandardMaterial({
                 color: new THREE.Color('#eae5d9'),
                 roughness: 0.45,
                 metalness: 0.05,
+                transparent: true,
+                opacity: 0.8,
               });
             } else if (system === 'vascular') {
               const isVein = mesh.name.toLowerCase().includes('vein') || mesh.name.toLowerCase().includes('vena');
               mesh.material = new THREE.MeshStandardMaterial({
                 color: isVein ? new THREE.Color('#2563eb') : new THREE.Color('#ef4444'),
-                emissive: isVein ? new THREE.Color('#1d4ed8') : new THREE.Color('#b91c1c'),
-                emissiveIntensity: 0.3,
-                roughness: 0.35,
-                metalness: 0.2,
+                roughness: 0.45,
+                metalness: 0.15,
+                transparent: true,
+                opacity: 0.7,
               });
             } else if (system === 'nervous') {
               mesh.material = new THREE.MeshStandardMaterial({
                 color: new THREE.Color('#06b6d4'),
-                emissive: new THREE.Color('#0891b2'),
-                emissiveIntensity: 0.45,
-                roughness: 0.3,
+                roughness: 0.45,
                 metalness: 0.1,
-              });
-            }
-          } else {
-            // Drug is C20H25ClN2O5 (Amlodipine) for Blood Pressure
-            // Affected parts: Blood vessels, Heart, Kidneys, Brain
-            if (system === 'vascular') {
-              // Blood vessels and heart highlighted in glowing RED & Azure
-              mesh.material = new THREE.MeshStandardMaterial({
-                color: new THREE.Color('#ef4444'),
-                emissive: new THREE.Color('#dc2626'),
-                emissiveIntensity: 0.85,
-                roughness: 0.25,
-                metalness: 0.2,
-              });
-            } else if (system === 'visceral') {
-              if (isKidneyMesh(mesh.name)) {
-                // Renal arterioles in kidneys highlighted in RED
-                mesh.material = new THREE.MeshStandardMaterial({
-                  color: new THREE.Color('#ef4444'),
-                  emissive: new THREE.Color('#dc2626'),
-                  emissiveIntensity: 0.9,
-                  roughness: 0.25,
-                  metalness: 0.15,
-                });
-              } else {
-                mesh.material = new THREE.MeshStandardMaterial({
-                  color: new THREE.Color('#786257'),
-                  roughness: 0.5,
-                  transparent: true,
-                  opacity: 0.8,
-                });
-              }
-            } else if (system === 'nervous') {
-              // Brain and cerebral microvasculature highlighted in RED/CYAN
-              mesh.material = new THREE.MeshStandardMaterial({
-                color: new THREE.Color('#ef4444'),
-                emissive: new THREE.Color('#e11d48'),
-                emissiveIntensity: 0.75,
-                roughness: 0.3,
-                metalness: 0.15,
-              });
-            } else {
-              mesh.material = new THREE.MeshStandardMaterial({
-                color: new THREE.Color('#eae5d9'),
-                roughness: 0.5,
+                transparent: true,
+                opacity: 0.7,
               });
             }
           }
@@ -272,7 +272,7 @@ function NormalizedModel({
     });
 
     return clone;
-  }, [scene, system, config.targetScale, isSimulated, isAmlodipine]);
+  }, [scene, system, config.targetScale, isSimulated, isAmlodipine, targetOrgans, affectedZones]);
 
   // Smooth continuous rotation around Y axis
   useFrame((_, delta) => {
@@ -355,6 +355,14 @@ export interface AnatomySpace3DProps {
   compoundId?: string;
   isSimulated?: boolean;
   className?: string;
+  targetOrgans?: string[];
+  affectedZones?: {
+    name: string;
+    system: AnatomicalSystem;
+    score: number;
+    color: 'red' | 'green' | 'blue';
+    role: string;
+  }[];
 }
 
 export function AnatomySpace3D({
@@ -365,6 +373,8 @@ export function AnatomySpace3D({
   compoundId = 'c4h11n5',
   isSimulated = false,
   className,
+  targetOrgans,
+  affectedZones,
 }: AnatomySpace3DProps) {
   const [activeSystem, setActiveSystem] = useState<AnatomicalSystem>(currentSystem);
   const [autoRotate, setAutoRotate] = useState(true);
@@ -465,30 +475,21 @@ export function AnatomySpace3D({
               <span className="h-2 w-2 rounded-full bg-zinc-500" />
               Baseline Anatomical View (Plain) — Click &quot;Simulate Organ Impact&quot; to highlight
             </span>
-          ) : !isAmlodipine ? (
-            <>
-              <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                TARGET (Pancreas / GI)
-              </span>
-              <span className="flex items-center gap-1.5 text-red-400 font-bold">
-                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
-                AFFECTED (Kidneys)
-              </span>
-              <span className="flex items-center gap-1.5 text-zinc-400">
-                <span className="h-2 w-2 rounded-full bg-zinc-500" />
-                NEUTRAL
-              </span>
-            </>
           ) : (
             <>
               <span className="flex items-center gap-1.5 text-red-400 font-bold">
                 <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
-                AFFECTED (Blood Vessels / Heart / Kidneys / Brain)
+                AFFECTED (Illuminated in RED)
               </span>
-              <span className="flex items-center gap-1.5 text-blue-400">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                VENOUS PERFUSION
+              {affectedZones && affectedZones.some((z) => z.color === 'green' || z.color === 'blue') && (
+                <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+                  TARGET ZONES
+                </span>
+              )}
+              <span className="flex items-center gap-1.5 text-zinc-400">
+                <span className="h-2 w-2 rounded-full bg-zinc-500" />
+                NEUTRAL TISSUE
               </span>
             </>
           )}
@@ -508,11 +509,13 @@ export function AnatomySpace3D({
 
         <Suspense fallback={<Loader />}>
           <NormalizedModel
-            key={`${activeSystem}-${isSimulated}-${compoundId}`}
+            key={`${activeSystem}-${isSimulated}-${compoundId}-${targetOrgans?.join('_') || ''}`}
             system={activeSystem}
             autoRotate={autoRotate}
             isSimulated={isSimulated}
             compoundId={compoundId}
+            targetOrgans={targetOrgans}
+            affectedZones={affectedZones}
           />
         </Suspense>
 

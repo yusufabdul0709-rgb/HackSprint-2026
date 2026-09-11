@@ -151,14 +151,29 @@ interface AnalysisAuditRecord {
   review_notes?: string;
 }
 
-export function AdmetAnalysisView() {
+export interface AdmetAnalysisViewProps {
+  initialSmiles?: string;
+  initialCandidateId?: string;
+}
+
+export function AdmetAnalysisView({
+  initialSmiles,
+  initialCandidateId,
+}: AdmetAnalysisViewProps = {}) {
   const { participants } = useTrialBridge();
 
   // Compound & SMILES State
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string>('c4h11n5');
-  const [customSmiles, setCustomSmiles] = useState<string>('CN(C)C(=N)NC(=N)N');
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(initialCandidateId || 'c4h11n5');
+  const [customSmiles, setCustomSmiles] = useState<string>(initialSmiles || 'CN(C)C(=N)NC(=N)N');
   const [dataSource, setDataSource] = useState<'real' | 'demo'>('real');
   const [isPredicting, setIsPredicting] = useState<boolean>(false);
+
+  // Sync with initialSmiles if changed
+  useEffect(() => {
+    if (initialSmiles) {
+      setCustomSmiles(initialSmiles);
+    }
+  }, [initialSmiles]);
 
   // Analysis Mode: Intrinsic Molecular ADMET vs Participant-Adjusted Exposure
   const [analysisMode, setAnalysisMode] = useState<'intrinsic' | 'participant_adjusted'>('participant_adjusted');

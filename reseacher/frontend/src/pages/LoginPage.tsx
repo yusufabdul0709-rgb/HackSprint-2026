@@ -36,9 +36,9 @@ export function LoginPage() {
       >
         <div className="flex flex-col items-center mb-8">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black border border-zinc-800 p-0.5 overflow-hidden shadow-inner mb-4">
-            <img src={logoImg} alt="TrialBridge Logo" className="h-full w-full object-contain rounded-lg" />
+            <img src="/logo.png" alt="TrailBridge Logo" className="h-full w-full object-contain rounded-lg" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome to TrialBridge</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome to TrailBridge</h1>
           <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
         </div>
 

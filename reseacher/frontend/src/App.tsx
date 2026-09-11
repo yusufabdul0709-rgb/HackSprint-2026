@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrialBridgeProvider } from '@/store/TrialBridgeContext';
 import { AuthProvider, useAuth } from '@/store/AuthContext';
+import { ThemeProvider, useTheme } from '@/store/ThemeContext';
 import { Sidebar, type NavKey } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { AdminDashboard } from '@/pages/dashboards/AdminDashboard';
@@ -34,6 +35,7 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const { role, isAuthenticated, isLoading } = useAuth();
+  const { isDark } = useTheme();
   const [currentNav, setCurrentNav] = useState<NavKey>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -44,7 +46,11 @@ function AppContent() {
   }, [role]);
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">Loading...</div>;
+    return (
+      <div className={cn('min-h-screen flex items-center justify-center font-medium', isDark ? 'bg-black text-white' : 'bg-white text-slate-900')}>
+        Loading TrailBridge...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -106,7 +112,12 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div
+      className={cn(
+        'min-h-screen transition-colors duration-200',
+        isDark ? 'bg-black text-white' : 'bg-slate-50/50 text-slate-900'
+      )}
+    >
       <Sidebar
         current={currentNav}
         onNavigate={setCurrentNav}
@@ -146,11 +157,13 @@ function AppContent() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TrialBridgeProvider>
-          <AppContent />
-        </TrialBridgeProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <TrialBridgeProvider>
+            <AppContent />
+          </TrialBridgeProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

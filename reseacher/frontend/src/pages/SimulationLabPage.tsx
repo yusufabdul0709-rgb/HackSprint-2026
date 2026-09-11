@@ -26,6 +26,11 @@ import {
   ChevronRight,
   Database,
   Clock,
+  Pill,
+  Search,
+  ExternalLink,
+  ShieldAlert,
+  Info,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '@/lib/api';
@@ -35,129 +40,83 @@ import {
   computeClinicalEfficacyMetrics,
 } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import {
+  predictCompoundFromSmiles,
+  type PredictedCompoundProfile,
+  formatSubscripts,
+} from '@/lib/smilesPredictor';
 
 type ActiveTopTab = 'overview' | 'admet' | 'benchmarks' | 'specs';
 
-interface ResearchCompound {
+interface BenchmarkPreset {
   id: string;
   name: string;
   formula: string;
   smiles: string;
+  organ: string;
+  system: AnatomicalSystem;
   condition: string;
-  mechanism: string;
-  defaultSystem: AnatomicalSystem;
   defaultDose: number;
   doseUnit: string;
-  doseMin: number;
-  doseMax: number;
-  doseStep: number;
-  affectedOrganName: string;
-  affectedZones: {
-    name: string;
-    system: AnatomicalSystem;
-    score: number;
-    color: 'red' | 'green' | 'blue';
-    role: string;
-  }[];
-  clinicalRationale: string;
 }
 
-const RESEARCH_COMPOUNDS: Record<string, ResearchCompound> = {
-  c4h11n5: {
+const REFERENCE_BENCHMARKS: BenchmarkPreset[] = [
+  {
     id: 'c4h11n5',
-    name: 'Metformin',
+    name: 'Metformin (T2D)',
     formula: 'C₄H₁₁N₅',
     smiles: 'CN(C)C(=N)NC(=N)N',
+    organ: 'Kidneys',
+    system: 'visceral',
     condition: 'Type 2 Diabetes',
-    mechanism: 'OCT2 / MATE1 Renal Tubular Excretion & Glomerular Preservation',
-    defaultSystem: 'visceral',
     defaultDose: 1000,
     doseUnit: 'mg/day',
-    doseMin: 250,
-    doseMax: 2000,
-    doseStep: 250,
-    affectedOrganName: 'Kidneys',
-    affectedZones: [
-      {
-        name: 'Kidneys (Affected / Renal Elimination Target)',
-        system: 'visceral',
-        score: 92,
-        color: 'red',
-        role: 'Primary tubular excretion pathway via OCT2/MATE1 transporters. Preserves glomerular filtration (eGFR > 60 mL/min) and reduces diabetic nephropathy risk.',
-      },
-      {
-        name: 'Pancreas (Islet Beta-Cells)',
-        system: 'visceral',
-        score: 88,
-        color: 'green',
-        role: 'Enhances peripheral insulin sensitivity and protects beta-cells against glucotoxicity.',
-      },
-      {
-        name: 'GI Tract / Colon',
-        system: 'visceral',
-        score: 70,
-        color: 'green',
-        role: 'Delays intestinal glucose absorption and stimulates endogenous GLP-1 release.',
-      },
-      {
-        name: 'Liver (Hepatic Gluconeogenesis)',
-        system: 'visceral',
-        score: 85,
-        color: 'blue',
-        role: 'AMPK phosphorylation downregulates excessive hepatic glucose output.',
-      },
-    ],
-    clinicalRationale:
-      'C₄H₁₁N₅ (Metformin) maintains steady renal tubular secretion through OCT2 transporters without nephrotoxic accumulation. Preserves glomerular filtration rate (eGFR > 60 mL/min) with robust glycemic control in Type-2 Diabetes.',
   },
-  c20h25cln2o5: {
+  {
     id: 'c20h25cln2o5',
-    name: 'Amlodipine',
+    name: 'Amlodipine (BP)',
     formula: 'C₂₀H₂₅ClN₂O₅',
     smiles: 'CCOC(=O)C1=C(COCCN)NC(C)=C(C(=O)OC)C1c1ccccc1Cl',
+    organ: 'Blood Vessels & Heart',
+    system: 'vascular',
     condition: 'Blood Pressure / Hypertension',
-    mechanism: 'L-Type Calcium Channel Blockade & Arteriolar Vasodilation',
-    defaultSystem: 'vascular',
     defaultDose: 5,
     doseUnit: 'mg/day',
-    doseMin: 2.5,
-    doseMax: 10,
-    doseStep: 2.5,
-    affectedOrganName: 'Blood Vessels, Brain, Heart, Kidneys',
-    affectedZones: [
-      {
-        name: 'Blood Vessels (Arteriolar Smooth Muscle)',
-        system: 'vascular',
-        score: 95,
-        color: 'red',
-        role: 'Direct peripheral arteriolar vasodilation, reducing systemic vascular resistance and lowering blood pressure.',
-      },
-      {
-        name: 'Heart & Coronary Arterioles',
-        system: 'vascular',
-        score: 92,
-        color: 'red',
-        role: 'Alleviates cardiac afterload, reduces myocardial oxygen demand, and relieves coronary spasms.',
-      },
-      {
-        name: 'Kidneys (Renal Arterioles)',
-        system: 'visceral',
-        score: 89,
-        color: 'red',
-        role: 'Preglomerular vasodilation sustains renal plasma flow and eGFR despite lower systemic blood pressure.',
-      },
-      {
-        name: 'Brain (Cerebral Microvasculature)',
-        system: 'nervous',
-        score: 86,
-        color: 'red',
-        role: 'Supports cerebral autoregulation, lowering stroke morbidity and microvascular ischemic damage.',
-      },
-    ],
-    clinicalRationale:
-      'C₂₀H₂₅ClN₂O₅ (Amlodipine) induces selective arterial vasodilation via L-type calcium channel antagonism. Achieves reliable 24h blood pressure reduction with target organ protection across blood vessels, brain, heart, and kidneys.',
   },
-};
+  {
+    id: 'aspirin',
+    name: 'Aspirin (Cardio)',
+    formula: 'C₉H₈O₄',
+    smiles: 'CC(=O)Oc1ccccc1C(=O)O',
+    organ: 'Stomach & Platelets',
+    system: 'visceral',
+    condition: 'Cardiovascular Prevention',
+    defaultDose: 81,
+    doseUnit: 'mg/day',
+  },
+  {
+    id: 'paracetamol',
+    name: 'Paracetamol (Hepatic)',
+    formula: 'C₈H₉NO₂',
+    smiles: 'CC(=O)Nc1ccc(O)cc1',
+    organ: 'Liver',
+    system: 'visceral',
+    condition: 'Analgesic & Antipyretic',
+    defaultDose: 500,
+    doseUnit: 'mg',
+  },
+  {
+    id: 'ibuprofen',
+    name: 'Ibuprofen (Renal/GI)',
+    formula: 'C₁₃H₁₈O₂',
+    smiles: 'CC(C)Cc1ccc(cc1)C(C)C(=O)O',
+    organ: 'Stomach & Kidneys',
+    system: 'visceral',
+    condition: 'Anti-inflammatory & Analgesic',
+    defaultDose: 400,
+    doseUnit: 'mg',
+  },
+];
 
 export function SimulationLabPage() {
   const { role } = useAuth();
@@ -166,12 +125,17 @@ export function SimulationLabPage() {
   const efficacyMetrics = computeClinicalEfficacyMetrics(participants);
 
   const [activeTab, setActiveTab] = useState<ActiveTopTab>('overview');
-  const [selectedCompoundId, setSelectedCompoundId] = useState<string>('c4h11n5');
+
+  // Interactive SMILES and Compound State
+  const [inputSmiles, setInputSmiles] = useState<string>('CN(C)C(=N)NC(=N)N');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('c4h11n5');
+  const [activeProfile, setActiveProfile] = useState<PredictedCompoundProfile>(() =>
+    predictCompoundFromSmiles('CN(C)C(=N)NC(=N)N')
+  );
+
   const [current3DSystem, setCurrent3DSystem] = useState<AnatomicalSystem>('visceral');
 
-  const activeCompound = RESEARCH_COMPOUNDS[selectedCompoundId] || RESEARCH_COMPOUNDS['c4h11n5'];
-
-  const [dosage, setDosage] = useState<number>(activeCompound.defaultDose);
+  const [dosage, setDosage] = useState<number>(1000);
   const [durationWeeks, setDurationWeeks] = useState<number>(24);
   const [baselineEgfr, setBaselineEgfr] = useState<number>(58.0);
   const [baselineBp, setBaselineBp] = useState<number>(145.0);
@@ -187,7 +151,7 @@ export function SimulationLabPage() {
     'Renal clearance profiles (OCT2/MATE1) and predicted AUC ratios verified safe. Target organ exposure within protocol parameters. Protocol approved.'
   );
   const [coordinatorNotes, setCoordinatorNotes] = useState<string>(
-    'eGFR >= 45 mL/min verified. C4H11N5 in-silico clearance at 91% exceeds protocol safety threshold.'
+    'eGFR >= 45 mL/min verified. In-silico clearance profile exceeds protocol safety threshold.'
   );
   const [showCoordinatorModal, setShowCoordinatorModal] = useState<boolean>(false);
   const [reviewTimestamp, setReviewTimestamp] = useState<string>('');
@@ -200,13 +164,13 @@ export function SimulationLabPage() {
     estimatedRetention: number;
     clinicalRationale: string;
     modelBadge: string;
-    trajectory?: { week: number; egfr?: number; sbp_mmhg?: number }[];
+    trajectory?: { week: number; egfr?: number; sbp_mmhg?: number; clearance?: number }[];
   } | null>(null);
 
   const handleSubmitToPi = async () => {
     try {
       await api.post('/admet/request-review', {
-        analysis_id: `AN-${selectedCompoundId.toUpperCase()}-001`,
+        analysis_id: `AN-${(activeProfile.formula || 'CMP').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-001`,
         study_id: 'DB-101',
         coordinator_name: 'Maya R',
         notes: coordinatorNotes,
@@ -225,7 +189,7 @@ export function SimulationLabPage() {
     const ts = new Date().toISOString();
     try {
       await api.post('/admet/review', {
-        analysis_id: `AN-${selectedCompoundId.toUpperCase()}-001`,
+        analysis_id: `AN-${(activeProfile.formula || 'CMP').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-001`,
         reviewer_name: 'Dr. J Patel',
         reviewer_role: 'PRINCIPAL_INVESTIGATOR',
         decision: admetReviewDecision,
@@ -243,23 +207,61 @@ export function SimulationLabPage() {
     }
   };
 
-  // When switching compounds, reset dosage and system
-  const handleCompoundChange = (id: string) => {
-    setSelectedCompoundId(id);
-    const comp = RESEARCH_COMPOUNDS[id];
-    if (comp) {
-      setDosage(comp.defaultDose);
-      setCurrent3DSystem(comp.defaultSystem);
+  // Selecting a reference benchmark compound
+  const handleSelectBenchmark = (preset: BenchmarkPreset) => {
+    setSelectedPresetId(preset.id);
+    setInputSmiles(preset.smiles);
+    const profile = predictCompoundFromSmiles(preset.smiles, {
+      dosage: preset.defaultDose,
+      durationWeeks,
+      baselineEgfr,
+      baselineBp,
+    });
+    setActiveProfile(profile);
+    setDosage(preset.defaultDose);
+    setCurrent3DSystem(profile.primarySystem);
+    setIsSimulated(false);
+    setSimulationResult(null);
+    toast.info(`Loaded reference compound: ${preset.name}`);
+  };
+
+  // Typing or pasting a custom SMILES
+  const handleSmilesChange = (val: string) => {
+    setInputSmiles(val);
+    setSelectedPresetId('');
+    if (val.trim().length > 3) {
+      const profile = predictCompoundFromSmiles(val, {
+        dosage,
+        durationWeeks,
+        baselineEgfr,
+        baselineBp,
+      });
+      setActiveProfile(profile);
       setIsSimulated(false);
       setSimulationResult(null);
     }
   };
 
+  // Run Simulation: predicts affected organ and illuminates in RED in 3D
   const handleRunSimulation = async () => {
+    if (!inputSmiles.trim()) {
+      toast.error('Please enter a valid SMILES string to simulate');
+      return;
+    }
+
     setIsSimulating(true);
+    const profile = predictCompoundFromSmiles(inputSmiles, {
+      dosage,
+      durationWeeks,
+      baselineEgfr,
+      baselineBp,
+    });
+    setActiveProfile(profile);
+
     try {
       const res = await api.post('/simulation/dose-response', {
-        compound: activeCompound.formula,
+        compound: profile.formula,
+        smiles: inputSmiles,
         dosage_mg: dosage,
         treatment_weeks: durationWeeks,
         baseline_egfr: baselineEgfr,
@@ -268,46 +270,39 @@ export function SimulationLabPage() {
 
       const data = res.data;
       setSimulationResult({
-        predictedEfficacy: data.predicted_efficacy ?? 88.4,
-        clearanceRate: data.clearance_rate ?? 92.8,
-        toxicityScore: data.toxicity_score ?? 1.2,
-        targetEngagement: data.target_engagement ?? 91.5,
-        estimatedRetention: data.estimated_retention ?? 95.0,
-        clinicalRationale: data.clinical_rationale ?? activeCompound.clinicalRationale,
+        predictedEfficacy: data.predicted_efficacy ?? profile.inSilico.predictedEfficacy,
+        clearanceRate: data.clearance_rate ?? profile.inSilico.clearanceRate,
+        toxicityScore: data.toxicity_score ?? profile.inSilico.toxicityScore,
+        targetEngagement: data.target_engagement ?? profile.inSilico.targetEngagement,
+        estimatedRetention: data.estimated_retention ?? profile.inSilico.estimatedRetention,
+        clinicalRationale: data.clinical_rationale ?? profile.inSilico.clinicalRationale,
         modelBadge: data.model ?? 'In-Silico Pharmacodynamic Model + Gemini 3.6 Flash',
-        trajectory: data.trajectory,
+        trajectory: data.trajectory ?? profile.inSilico.trajectory,
       });
 
       setIsSimulated(true);
-      // Auto-focus to appropriate 3D system if needed
-      setCurrent3DSystem(activeCompound.defaultSystem);
+      // Auto-focus to the predicted anatomical system where the affected organ resides
+      setCurrent3DSystem(profile.primarySystem);
       toast.success(
-        `Simulation active: Affected organ (${activeCompound.affectedOrganName}) illuminated in 3D`
+        `Simulation active: Affected organ (${profile.primaryOrgan}) illuminated in RED in 3D model`
       );
     } catch {
-      // Local fallback in case backend is offline
-      const isMetformin = activeCompound.id === 'c4h11n5';
-      const doseFactor = isMetformin ? dosage / 1000 : dosage / 5;
-      const efficacy = isMetformin
-        ? Math.min(97, 82 + doseFactor * 10)
-        : Math.min(96, 78 + doseFactor * 12);
-      const clearance = isMetformin ? Math.max(82, 94 - doseFactor * 3) : 88.5;
-      const toxicity = isMetformin ? Number((0.8 + doseFactor * 0.4).toFixed(1)) : 1.1;
-
+      // Local cheminformatics engine fallback
       setSimulationResult({
-        predictedEfficacy: Number(efficacy.toFixed(1)),
-        clearanceRate: Number(clearance.toFixed(1)),
-        toxicityScore: toxicity,
-        targetEngagement: Number((86 + doseFactor * 6).toFixed(1)),
-        estimatedRetention: 95.0,
-        clinicalRationale: activeCompound.clinicalRationale,
-        modelBadge: 'Local Pharmacodynamic Engine (Gemini Grounded)',
+        predictedEfficacy: profile.inSilico.predictedEfficacy,
+        clearanceRate: profile.inSilico.clearanceRate,
+        toxicityScore: profile.inSilico.toxicityScore,
+        targetEngagement: profile.inSilico.targetEngagement,
+        estimatedRetention: profile.inSilico.estimatedRetention,
+        clinicalRationale: profile.inSilico.clinicalRationale,
+        modelBadge: 'Local Pharmacophore & In-Silico Engine (ADA 2026 Grounded)',
+        trajectory: profile.inSilico.trajectory,
       });
 
       setIsSimulated(true);
-      setCurrent3DSystem(activeCompound.defaultSystem);
+      setCurrent3DSystem(profile.primarySystem);
       toast.success(
-        `Simulation completed: Affected organ (${activeCompound.affectedOrganName}) illuminated in 3D`
+        `Simulation active: Affected organ (${profile.primaryOrgan}) illuminated in RED in 3D space`
       );
     } finally {
       setIsSimulating(false);
@@ -377,8 +372,8 @@ export function SimulationLabPage() {
           >
             <Play className={cn('h-4 w-4', isSimulating && 'animate-spin')} />
             {isSimulating
-              ? `Simulating ${activeCompound.formula}...`
-              : `Simulate Organ Impact (${activeCompound.formula})`}
+              ? `Simulating ${activeProfile.formula}...`
+              : `Simulate Organ Impact (${activeProfile.formula})`}
           </Button>
         </div>
       </div>
@@ -425,7 +420,7 @@ export function SimulationLabPage() {
                   Investigator ADMET Review &amp; Clinical Sign-Off
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Human-in-the-loop clinical review gate for compound {activeCompound.formula}. Decision terminates here at the PI.
+                  Human-in-the-loop clinical review gate for compound {activeProfile.formula}. Decision terminates here at the PI.
                 </p>
               </div>
             </div>
@@ -546,65 +541,145 @@ export function SimulationLabPage() {
         </div>
       )}
 
-      {/* Target Drug Focus & Selection Banner */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-md',
-              selectedCompoundId === 'c4h11n5' ? 'bg-red-600' : 'bg-blue-600'
-            )}
-          >
-            {selectedCompoundId === 'c4h11n5' ? (
-              <Activity className="h-6 w-6" />
-            ) : (
-              <HeartPulse className="h-6 w-6" />
-            )}
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Active Research Compound:
-              </span>
-              <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-bold text-blue-800">
-                {activeCompound.name} ({activeCompound.formula})
-              </span>
-              <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                Condition: {activeCompound.condition}
-              </span>
+      {/* TARGET DRUG & SMILES INTERACTIVE RESEARCH WORKBENCH BANNER */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+        {/* Row 1: Active Compound & Live Affected Organ Indicator */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-3.5">
+            <div
+              className={cn(
+                'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-md transition-all',
+                activeProfile.primarySystem === 'vascular'
+                  ? 'bg-blue-600'
+                  : activeProfile.primarySystem === 'nervous'
+                  ? 'bg-cyan-600'
+                  : activeProfile.primarySystem === 'skeletal'
+                  ? 'bg-amber-600'
+                  : 'bg-red-600'
+              )}
+            >
+              {activeProfile.primarySystem === 'vascular' ? (
+                <HeartPulse className="h-6 w-6" />
+              ) : activeProfile.primarySystem === 'nervous' ? (
+                <Brain className="h-6 w-6" />
+              ) : (
+                <Activity className="h-6 w-6" />
+              )}
             </div>
-            <p className="text-xs text-slate-600 mt-1">
-              <strong>Affected Anatomical Target:</strong>{' '}
-              <span className="font-bold text-red-600">{activeCompound.affectedOrganName}</span>{' '}
-              ({isSimulated ? 'Currently Illuminated in RED in 3D model' : 'Plain baseline state — Click Simulate to highlight'})
-            </p>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Active Research Compound:
+                </span>
+                <span className="rounded-md bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-bold text-blue-800">
+                  {activeProfile.name} ({activeProfile.formula})
+                </span>
+                <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                  Condition: {activeProfile.condition}
+                </span>
+                <span className="rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-mono text-slate-600">
+                  3D System: {activeProfile.primarySystem.toUpperCase()}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">
+                <strong>Affected Anatomical Target:</strong>{' '}
+                <span className="font-bold text-red-600 text-sm">{activeProfile.primaryOrgan}</span>{' '}
+                <span className="text-slate-500">
+                  ({isSimulated
+                    ? 'Currently Illuminated in glowing RED in 3D space'
+                    : 'Plain baseline state — Click "Simulate Organ Impact" to highlight in RED'})
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Descriptor Metric Badges */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto text-[11px] font-mono">
+            <span className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700">
+              MW: <strong>{activeProfile.molecularWeight} g/mol</strong>
+            </span>
+            <span className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700">
+              LogP: <strong>{activeProfile.logP}</strong>
+            </span>
+            <span className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700">
+              TPSA: <strong>{activeProfile.tpsa} Å²</strong>
+            </span>
           </div>
         </div>
 
-        {/* Drug Selector Switcher Buttons */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            onClick={() => handleCompoundChange('c4h11n5')}
-            className={cn(
-              'px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
-              selectedCompoundId === 'c4h11n5'
-                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-            )}
-          >
-            C₄H₁₁N₅ (Metformin - T2D)
-          </button>
-          <button
-            onClick={() => handleCompoundChange('c20h25cln2o5')}
-            className={cn(
-              'px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
-              selectedCompoundId === 'c20h25cln2o5'
-                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-            )}
-          >
-            C₂₀H₂₅ClN₂O₅ (Amlodipine - BP)
-          </button>
+        {/* Row 2: SMILES Input Field + Simulation Trigger */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Atom className="h-4 w-4 text-blue-600" />
+              SMILES Chemical Structure Notation:
+            </label>
+            <span className="text-[11px] text-slate-400">
+              Enter any valid SMILES or choose a benchmark compound below
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={inputSmiles}
+                onChange={(e) => handleSmilesChange(e.target.value)}
+                placeholder="Enter SMILES notation (e.g., CN(C)C(=N)NC(=N)N or CC(=O)Oc1ccccc1C(=O)O)..."
+                className="w-full font-mono text-xs rounded-xl border border-slate-300 bg-slate-50/60 px-3.5 py-2.5 pr-16 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+              />
+              {inputSmiles && (
+                <button
+                  type="button"
+                  onClick={() => handleSmilesChange('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-400 hover:text-slate-700 px-1.5 py-0.5 rounded"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <Button
+              onClick={handleRunSimulation}
+              disabled={isSimulating || !inputSmiles.trim()}
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs shrink-0"
+            >
+              <Play className={cn('h-3.5 w-3.5', isSimulating && 'animate-spin')} />
+              {isSimulating ? 'Simulating Organ Impact...' : 'Simulate SMILES'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Row 3: Reference Benchmark Pills (Preserving Existing Disease Compounds & Benchmarks) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
+            Reference Testing Benchmarks:
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {REFERENCE_BENCHMARKS.map((preset) => {
+              const isSelected = selectedPresetId === preset.id || inputSmiles === preset.smiles;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => handleSelectBenchmark(preset)}
+                  className={cn(
+                    'px-3 py-1 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5',
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full',
+                      isSelected ? 'bg-white' : 'bg-blue-500'
+                    )}
+                  />
+                  <span>{preset.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -665,7 +740,7 @@ export function SimulationLabPage() {
 
       {/* Main Viewport Content */}
       {activeTab === 'admet' ? (
-        <AdmetAnalysisView />
+        <AdmetAnalysisView initialSmiles={inputSmiles} initialCandidateId={selectedPresetId || 'c4h11n5'} />
       ) : activeTab === 'benchmarks' ? (
         /* Clinical Participants Benchmark Tab */
         <div className="rounded-2xl bg-white p-6 border border-slate-200/80 shadow-sm space-y-4">
@@ -725,25 +800,36 @@ export function SimulationLabPage() {
         <div className="rounded-2xl bg-white p-6 border border-slate-200/80 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Atom className="h-4 w-4 text-purple-600" />
-            Molecular Structure &amp; Receptor Binding
+            Molecular Structure &amp; Physicochemical Analysis
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <span className="text-[10px] uppercase font-bold text-slate-400">Chemical Identity</span>
-              <p className="text-base font-bold text-slate-900">{activeCompound.name}</p>
-              <p className="font-mono text-xs text-blue-700">Formula: {activeCompound.formula}</p>
+              <p className="text-base font-bold text-slate-900">{activeProfile.name}</p>
+              <p className="font-mono text-xs text-blue-700">Formula: {activeProfile.formula}</p>
               <p className="font-mono text-[11px] text-slate-600 break-all">
-                SMILES: {activeCompound.smiles}
+                SMILES: {activeProfile.smiles}
               </p>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Mechanism of Action</span>
-              <p className="text-sm font-semibold text-slate-800">{activeCompound.mechanism}</p>
-              <p className="text-slate-600 leading-relaxed text-[11px]">
-                {activeCompound.clinicalRationale}
-              </p>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Physicochemical Descriptors</span>
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                <div>MW: <strong>{activeProfile.molecularWeight} g/mol</strong></div>
+                <div>LogP: <strong>{activeProfile.logP}</strong></div>
+                <div>TPSA: <strong>{activeProfile.tpsa} Å²</strong></div>
+                <div>Rotatable: <strong>{activeProfile.rotatableBonds}</strong></div>
+                <div>H-Bond Donors: <strong>{activeProfile.hbd}</strong></div>
+                <div>H-Bond Acceptors: <strong>{activeProfile.hba}</strong></div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 sm:col-span-2 lg:col-span-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Target &amp; Mechanism</span>
+              <p className="text-xs font-bold text-slate-900">Primary Organ: {activeProfile.primaryOrgan}</p>
+              <p className="text-[11px] text-slate-700">{activeProfile.mechanism}</p>
+              <p className="text-[11px] text-slate-500">{activeProfile.inSilico.clinicalRationale}</p>
             </div>
           </div>
         </div>
@@ -757,10 +843,10 @@ export function SimulationLabPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Sliders className="h-4 w-4 text-blue-600" />
-                  Trial Parameters: {activeCompound.formula}
+                  Trial Parameters: {activeProfile.formula}
                 </h2>
                 <span className="text-[11px] font-mono text-slate-500">
-                  Target: {activeCompound.affectedOrganName.split(',')[0]}
+                  Target: {activeProfile.primaryOrgan.split(',')[0]}
                 </span>
               </div>
 
@@ -769,27 +855,27 @@ export function SimulationLabPage() {
                 <div className="flex justify-between text-xs">
                   <span className="font-semibold text-slate-700">Simulated Daily Dosage</span>
                   <span className="font-bold text-blue-600">
-                    {dosage} {activeCompound.doseUnit}
+                    {dosage} {activeProfile.doseUnit}
                   </span>
                 </div>
                 <input
                   type="range"
-                  min={activeCompound.doseMin}
-                  max={activeCompound.doseMax}
-                  step={activeCompound.doseStep}
+                  min={activeProfile.doseMin}
+                  max={activeProfile.doseMax}
+                  step={activeProfile.doseStep}
                   value={dosage}
                   onChange={(e) => setDosage(Number(e.target.value))}
                   className="mt-2 w-full accent-blue-600 cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                   <span>
-                    {activeCompound.doseMin} {activeCompound.doseUnit} (Min)
+                    {activeProfile.doseMin} {activeProfile.doseUnit} (Min)
                   </span>
                   <span>
-                    {activeCompound.defaultDose} {activeCompound.doseUnit} (Standard)
+                    {activeProfile.defaultDose} {activeProfile.doseUnit} (Standard)
                   </span>
                   <span>
-                    {activeCompound.doseMax} {activeCompound.doseUnit} (Max)
+                    {activeProfile.doseMax} {activeProfile.doseUnit} (Max)
                   </span>
                 </div>
               </div>
@@ -848,9 +934,96 @@ export function SimulationLabPage() {
                   <Play className={cn('h-4 w-4', isSimulating && 'animate-spin')} />
                   {isSimulating
                     ? 'Simulating Organ Impact...'
-                    : `Simulate Organ Impact (${activeCompound.formula})`}
+                    : `Simulate Organ Impact (${activeProfile.formula})`}
                 </Button>
               </div>
+            </div>
+
+            {/* ADMET PROPERTIES & SAFETY ANALYSIS CARD */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-emerald-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    ADMET Properties &amp; Disposition
+                  </h3>
+                </div>
+                <span
+                  className={cn(
+                    'text-[10px] font-bold px-2.5 py-0.5 rounded-full border',
+                    activeProfile.admet.verdict === 'Favorable model profile'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : activeProfile.admet.verdict === 'Caution'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  )}
+                >
+                  {activeProfile.admet.verdict}
+                </span>
+              </div>
+
+              {/* 5-Metric ADMET Scores Progress Grid */}
+              <div className="grid grid-cols-5 gap-2 pt-1">
+                {[
+                  { label: 'Absorption', val: activeProfile.admet.absorption, color: 'bg-blue-500' },
+                  { label: 'Distribution', val: activeProfile.admet.distribution, color: 'bg-indigo-500' },
+                  { label: 'Metabolism', val: activeProfile.admet.metabolism, color: 'bg-purple-500' },
+                  { label: 'Excretion', val: activeProfile.admet.excretion, color: 'bg-teal-500' },
+                  { label: 'Tox Safety', val: activeProfile.admet.toxicity, color: 'bg-emerald-500' },
+                ].map((item) => (
+                  <div key={item.label} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                    <span className="text-[10px] text-slate-500 font-semibold block truncate">
+                      {item.label}
+                    </span>
+                    <span className="text-base font-extrabold text-slate-900 mt-0.5 block">
+                      {item.val}%
+                    </span>
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all duration-500', item.color)}
+                        style={{ width: `${item.val}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pharmacokinetic Highlights Bar */}
+              <div className="grid grid-cols-3 gap-2 text-[11px] pt-1">
+                <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-100 text-blue-900">
+                  <span className="text-[10px] text-blue-600 block">Bioavailability</span>
+                  <strong>{activeProfile.admet.bioavailability}%</strong>
+                </div>
+                <div className="p-2 rounded-lg bg-teal-50/70 border border-teal-100 text-teal-900">
+                  <span className="text-[10px] text-teal-600 block">Organ Clearance</span>
+                  <strong>{activeProfile.admet.clearance_l_h} L/h</strong>
+                </div>
+                <div className="p-2 rounded-lg bg-indigo-50/70 border border-indigo-100 text-indigo-900">
+                  <span className="text-[10px] text-indigo-600 block">BBB Penetrance</span>
+                  <strong>{activeProfile.admet.bbb_penetration ? 'Permeant' : 'Low / Non-permeant'}</strong>
+                </div>
+              </div>
+
+              {/* Safety Signals if any */}
+              {activeProfile.admet.safety_signals.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-[11px]">
+                    <span className="font-bold">{activeProfile.admet.safety_signals[0].name}: </span>
+                    <span>{activeProfile.admet.safety_signals[0].description}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Tab Switch link */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('admet')}
+                className="w-full text-center text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 pt-1"
+              >
+                <span>View Full ADMET Radar &amp; Participant Stratification</span>
+                <ExternalLink className="h-3 w-3" />
+              </button>
             </div>
 
             {/* Affected Organ & Target Zones Mapping */}
@@ -879,18 +1052,18 @@ export function SimulationLabPage() {
 
               <p className="text-[11px] text-slate-500 leading-relaxed">
                 {isSimulated
-                  ? `Simulation active: The affected part (${activeCompound.affectedOrganName}) is highlighted in RED below:`
-                  : `Plain baseline view. Click "Simulate Organ Impact" to highlight the affected part in RED.`}
+                  ? `Simulation active: The affected part (${activeProfile.primaryOrgan}) is highlighted in glowing RED below:`
+                  : `Plain baseline view. Click "Simulate Organ Impact" to highlight the affected organ in RED.`}
               </p>
 
               <div className="space-y-2 pt-1">
-                {activeCompound.affectedZones.map((zone, idx) => (
+                {activeProfile.affectedZones.map((zone, idx) => (
                   <div
                     key={idx}
                     className={cn(
                       'p-3 rounded-xl border transition-all text-xs',
                       isSimulated && zone.color === 'red'
-                        ? 'bg-red-50/60 border-red-200'
+                        ? 'bg-red-50/70 border-red-200 shadow-xs'
                         : isSimulated && zone.color === 'green'
                         ? 'bg-emerald-50/50 border-emerald-200'
                         : 'bg-slate-50 border-slate-200/70'
@@ -958,11 +1131,11 @@ export function SimulationLabPage() {
                   </div>
 
                   <div className="rounded-xl bg-white p-3 border border-slate-200">
-                    <span className="text-[10px] text-slate-400">Renal Clearance Capacity</span>
+                    <span className="text-[10px] text-slate-400">Organ Clearance Capacity</span>
                     <p className="text-lg font-extrabold text-blue-600 mt-0.5">
                       {simulationResult.clearanceRate}%
                     </p>
-                    <span className="text-[10px] text-blue-600 font-medium">Tubular secretion</span>
+                    <span className="text-[10px] text-blue-600 font-medium">Clearance reserve</span>
                   </div>
 
                   <div className="rounded-xl bg-white p-3 border border-slate-200">
@@ -1003,12 +1176,12 @@ export function SimulationLabPage() {
                 />
                 <span className="font-semibold text-slate-800">
                   {isSimulated
-                    ? `Affected Part: ${activeCompound.affectedOrganName} (Highlighted in RED)`
+                    ? `Affected Part: ${activeProfile.primaryOrgan} (Highlighted in RED)`
                     : 'Plain Anatomical Baseline View'}
                 </span>
               </div>
               <span className="font-mono text-[11px] text-blue-600 font-bold">
-                Compound: {activeCompound.formula}
+                Compound: {activeProfile.formula}
               </span>
             </div>
 
@@ -1016,10 +1189,12 @@ export function SimulationLabPage() {
             <AnatomySpace3D
               currentSystem={current3DSystem}
               onSystemChange={(sys) => setCurrent3DSystem(sys)}
-              drugFormula={activeCompound.formula}
-              condition={activeCompound.condition}
-              compoundId={activeCompound.id}
+              drugFormula={activeProfile.formula}
+              condition={activeProfile.condition}
+              compoundId={activeProfile.id}
               isSimulated={isSimulated}
+              targetOrgans={activeProfile.targetOrgans}
+              affectedZones={activeProfile.affectedZones}
             />
 
             {/* Quick Helper Notes */}

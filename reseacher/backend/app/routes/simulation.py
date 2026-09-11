@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from app.db.mongodb import get_db
 from app.core.security import get_current_user
 from app.core.permissions import require_role
@@ -62,6 +62,7 @@ def get_sim_results(
 
 class DoseResponseRequest(BaseModel):
     compound: str = "C4H11N5"
+    smiles: Optional[str] = None
     dosage_mg: int = 1000
     treatment_weeks: int = 24
     baseline_egfr: float = 58.0
@@ -92,6 +93,36 @@ def get_compounds(
             "affected_organ": "Blood Vessels, Brain, Heart, Kidneys",
             "mechanism": "L-type Calcium Channel Antagonism & Arteriolar Vasodilation",
             "primary_3d_system": "vascular"
+        },
+        {
+            "id": "aspirin",
+            "name": "C₉H₈O₄ (Aspirin)",
+            "formula": "C₉H₈O₄",
+            "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+            "condition": "Cardiovascular Prevention & Anti-inflammatory",
+            "affected_organ": "Stomach, Platelets",
+            "mechanism": "Irreversible COX-1 Acetylation & Platelet Anti-aggregation",
+            "primary_3d_system": "visceral"
+        },
+        {
+            "id": "paracetamol",
+            "name": "C₈H₉NO₂ (Paracetamol)",
+            "formula": "C₈H₉NO₂",
+            "smiles": "CC(=O)Nc1ccc(O)cc1",
+            "condition": "Analgesic & Antipyretic",
+            "affected_organ": "Liver",
+            "mechanism": "Central Prostaglandin Synthesis & Hepatic Glucuronidation",
+            "primary_3d_system": "visceral"
+        },
+        {
+            "id": "ibuprofen",
+            "name": "C₁₃H₁₈O₂ (Ibuprofen)",
+            "formula": "C₁₃H₁₈O₂",
+            "smiles": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+            "condition": "Anti-inflammatory & Analgesic",
+            "affected_organ": "Stomach, Kidneys",
+            "mechanism": "Non-Selective COX-1 / COX-2 Reversible Antagonism",
+            "primary_3d_system": "visceral"
         }
     ]
 
@@ -103,6 +134,7 @@ def run_dose_response(
     from app.services.ai_safeguards_service import simulate_pharmacodynamic_response
     result = simulate_pharmacodynamic_response(
         compound=req.compound,
+        smiles=req.smiles,
         dosage_mg=req.dosage_mg,
         treatment_weeks=req.treatment_weeks,
         baseline_egfr=req.baseline_egfr,

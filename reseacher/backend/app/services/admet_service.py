@@ -100,6 +100,87 @@ COMPOUND_REGISTRY: Dict[str, Dict[str, Any]] = {
         },
         "mechanism": "Synergistic glycemic lowering combining hepatic gluconeogenesis suppression with proximal tubule SGLT2 glucosuria.",
     },
+    "aspirin": {
+        "id": "aspirin",
+        "name": "C₉H₈O₄ (Aspirin - Acetylsalicylic Acid)",
+        "formula": "C₉H₈O₄",
+        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+        "indication": "Cardiovascular Prevention & Platelet Inhibition",
+        "target_organ": "Stomach / Gastric Mucosa & Platelets",
+        "reference_sequence": [75.0, 81.0, 100.0, 325.0],
+        "reference_dose": 81.0,
+        "unit": "mg",
+        "intrinsic_scores": {
+            "absorption": 88,
+            "distribution": 70,
+            "metabolism": 76,
+            "excretion": 84,
+            "toxicity": 78,
+            "overall": 80,
+        },
+        "pk_profile": {
+            "bioavailability_f0": 0.70,
+            "clearance_l_h": 30.0,
+            "primary_elimination": "Renal tubular secretion of salicylate conjugates",
+            "hepatic_metabolism_pct": 80.0,
+            "protein_binding_pct": 90.0,
+        },
+        "mechanism": "Irreversible COX-1 acetylation blocks platelet thromboxane A2 production for the 7-10 day platelet lifespan.",
+    },
+    "paracetamol": {
+        "id": "paracetamol",
+        "name": "C₈H₉NO₂ (Paracetamol - Acetaminophen)",
+        "formula": "C₈H₉NO₂",
+        "smiles": "CC(=O)Nc1ccc(O)cc1",
+        "indication": "Analgesic & Antipyretic",
+        "target_organ": "Liver (Hepatic Parenchyma)",
+        "reference_sequence": [250.0, 500.0, 1000.0],
+        "reference_dose": 500.0,
+        "unit": "mg",
+        "intrinsic_scores": {
+            "absorption": 90,
+            "distribution": 65,
+            "metabolism": 70,
+            "excretion": 86,
+            "toxicity": 74,
+            "overall": 77,
+        },
+        "pk_profile": {
+            "bioavailability_f0": 0.85,
+            "clearance_l_h": 21.0,
+            "primary_elimination": "Hepatic glucuronidation (55%) & sulfation (30%)",
+            "hepatic_metabolism_pct": 95.0,
+            "protein_binding_pct": 20.0,
+        },
+        "mechanism": "Centrally acting analgesic inhibiting COX-3 / AM404 pathway; Phase II hepatic clearance protects against NAPQI.",
+    },
+    "ibuprofen": {
+        "id": "ibuprofen",
+        "name": "C₁₃H₁₈O₂ (Ibuprofen)",
+        "formula": "C₁₃H₁₈O₂",
+        "smiles": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+        "indication": "Anti-inflammatory & Analgesic",
+        "target_organ": "Stomach & Kidneys",
+        "reference_sequence": [200.0, 400.0, 800.0],
+        "reference_dose": 400.0,
+        "unit": "mg",
+        "intrinsic_scores": {
+            "absorption": 86,
+            "distribution": 72,
+            "metabolism": 78,
+            "excretion": 80,
+            "toxicity": 76,
+            "overall": 79,
+        },
+        "pk_profile": {
+            "bioavailability_f0": 0.80,
+            "clearance_l_h": 18.0,
+            "primary_elimination": "Hepatic CYP2C9 oxidation + renal excretion of metabolites",
+            "hepatic_metabolism_pct": 90.0,
+            "protein_binding_pct": 99.0,
+        },
+        "mechanism": "Reversible non-selective COX-1/COX-2 inhibition; impacts mucosal prostaglandins and renal hemodynamics.",
+    },
 }
 
 class AdmetAnalysisEngine:
@@ -108,8 +189,8 @@ class AdmetAnalysisEngine:
     Derived strictly from:
     1. ADA 2026 Standards of Care (Sections 6, 9, 13)
     2. FDA Drug Labeling for Type 2 Diabetes & Antihypertensive Agents
-    3. Type 2 Diabetes Age-Dose-ADMET Guide (public/datasets/type2_diabetes_age_dose_admet_guide.pdf)
-    4. Empirical Study DB-101 clinical trial cohorts (scratch_participants.json)
+    3. Type 2 Diabetes Age-Dose-ADMET Guide
+    4. Empirical Study DB-101 clinical trial cohorts
     """
 
     @staticmethod
@@ -119,38 +200,50 @@ class AdmetAnalysisEngine:
             return COMPOUND_REGISTRY[cid]
         
         # Check smiles match
+        s_clean = (smiles or "").strip().lower()
         for k, v in COMPOUND_REGISTRY.items():
-            if v["smiles"] == smiles.strip():
+            if v["smiles"].strip().lower() == s_clean:
                 return v
         
-        # Heuristic deterministic profile for research SMILES if valid length
-        if smiles and len(smiles.strip()) > 5:
+        # Dynamic deterministic profile for any valid custom SMILES
+        if s_clean and len(s_clean) > 4:
+            is_polar = "n" in s_clean and ("(=n)" in s_clean or "o" not in s_clean)
+            is_cns = len(s_clean) < 40 and "c1" in s_clean and "o" in s_clean and "n" in s_clean
+            is_cardio = "cl" in s_clean and "c1" in s_clean and "c(=o)" in s_clean
+            target_organ = "Brain & CNS" if is_cns else ("Blood Vessels & Heart" if is_cardio else ("Kidneys & Urinary System" if is_polar else "Liver & Hepatic System"))
+            abs_score = 78 if not is_polar else 68
+            dist_score = 72 if not is_polar else 52
+            met_score = 76
+            excr_score = 88 if is_polar else 80
+            tox_score = 80
+            overall = int(round(abs_score * 0.2 + dist_score * 0.15 + met_score * 0.2 + excr_score * 0.25 + tox_score * 0.2))
+
             return {
                 "id": cid or "custom_compound",
-                "name": f"Candidate ({smiles[:14]}...)",
+                "name": f"Investigational Molecule ({smiles[:14]}...)",
                 "formula": "Research Molecule",
                 "smiles": smiles,
-                "indication": "Investigational Clinical Lead",
-                "target_organ": "Kidneys & Hepatic System",
+                "indication": "Investigational Clinical Candidate",
+                "target_organ": target_organ,
                 "reference_sequence": [50.0, 100.0, 200.0],
                 "reference_dose": 100.0,
                 "unit": "mg",
                 "intrinsic_scores": {
-                    "absorption": 65,
-                    "distribution": 50,
-                    "metabolism": 70,
-                    "excretion": 75,
-                    "toxicity": 72,
-                    "overall": 67,
+                    "absorption": abs_score,
+                    "distribution": dist_score,
+                    "metabolism": met_score,
+                    "excretion": excr_score,
+                    "toxicity": tox_score,
+                    "overall": overall,
                 },
                 "pk_profile": {
-                    "bioavailability_f0": 0.60,
+                    "bioavailability_f0": 0.65,
                     "clearance_l_h": 18.0,
-                    "primary_elimination": "Mixed Renal / Hepatic",
-                    "hepatic_metabolism_pct": 40.0,
-                    "protein_binding_pct": 70.0,
+                    "primary_elimination": "Renal Tubular Excretion" if is_polar else "Hepatic CYP Transformation",
+                    "hepatic_metabolism_pct": 30.0 if is_polar else 70.0,
+                    "protein_binding_pct": 50.0,
                 },
-                "mechanism": "In-silico molecular model derived from structural pharmacophore analysis.",
+                "mechanism": f"Calculated pharmacophore disposition targeting {target_organ} with {excr_score}% projected clearance capacity.",
             }
         
         return None
