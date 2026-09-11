@@ -107,7 +107,7 @@ export function ParticipantsPage({
                   key={p.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: i * 20 }}
+                  transition={{ duration: 0.15 }}
                   className="hover:bg-slate-50 cursor-pointer transition-colors"
                   onClick={() => setSelected(p)}
                 >

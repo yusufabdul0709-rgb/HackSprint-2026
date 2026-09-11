@@ -269,7 +269,7 @@ export function ParticipantPortal({ onNavigate }: Props) {
             key={stat.label}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 60 }}
+            transition={{ duration: 0.2 }}
             className="rounded-2xl border border-slate-200/60 bg-white p-5"
           >
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.bg}`}>

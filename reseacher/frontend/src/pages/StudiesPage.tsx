@@ -121,7 +121,7 @@ export function StudiesPage() {
               key={study.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 50 }}
+              transition={{ duration: 0.2 }}
               onClick={() => setSelectedStudy(study)}
               className="card-hover cursor-pointer rounded-2xl border border-slate-200/60 bg-white p-5"
             >

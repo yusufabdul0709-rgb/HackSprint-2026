@@ -96,7 +96,7 @@ export function TasksPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ delay: i * 30 }}
+              transition={{ duration: 0.15 }}
               className={cn(
                 'rounded-2xl border bg-white p-4 transition-all',
                 task.status === 'overdue' ? 'border-red-200' : 'border-slate-200/60'
